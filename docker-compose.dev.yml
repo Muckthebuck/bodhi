@@ -1,0 +1,36 @@
+
+# ============================================================
+# Bodhi — Development Overrides
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================
+
+services:
+
+  # Expose all ports locally for debugging
+  postgres:
+    ports:
+      - "5432:5432"
+
+  neo4j:
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+
+  qdrant:
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  grafana:
+    ports:
+      - "3000:3000"
+    environment:
+      GF_LOG_LEVEL: debug

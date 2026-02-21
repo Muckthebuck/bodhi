@@ -1,0 +1,318 @@
+
+# ============================================================
+# Bodhi — Docker Compose
+# ============================================================
+# Usage:
+#   Production:  docker compose up -d
+#   Development: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 15s
+  timeout: 5s
+  retries: 5
+  start_period: 30s
+
+services:
+
+  # ──────────────────────────────────────────────
+  # Infrastructure
+  # ──────────────────────────────────────────────
+
+  redis:
+    image: redis:7.4.7-alpine
+    container_name: bodhi-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "redis-cli", "ping"]
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 256m
+    cpus: 0.5
+
+  postgres:
+    image: postgres:15.15-alpine
+    container_name: bodhi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bodhi
+      POSTGRES_USER: bodhi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/init-db/postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "pg_isready -U bodhi -d bodhi"]
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 512m
+    cpus: 1.0
+
+  neo4j:
+    image: neo4j:5.26.21-community
+    container_name: bodhi-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 256m
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      start_period: 60s
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 1g
+    cpus: 1.0
+
+  neo4j-init:
+    image: neo4j:5.26.21-community
+    container_name: bodhi-neo4j-init
+    restart: "no"
+    environment:
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+    volumes:
+      - ./infra/init-db/neo4j.cypher:/init.cypher:ro
+    command: ["cypher-shell", "-a", "bolt://neo4j:7687", "--file", "/init.cypher"]
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - bodhi-network
+    logging: *default-logging
+
+  qdrant:
+    image: qdrant/qdrant:v1.17.0
+    container_name: bodhi-qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+      - ./config/qdrant.yaml:/qdrant/config/production.yaml:ro
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333' 2>/dev/null || exit 1"]
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 512m
+    cpus: 1.0
+
+  # ──────────────────────────────────────────────
+  # Monitoring
+  # ──────────────────────────────────────────────
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    container_name: bodhi-node-exporter
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    healthcheck:
+      # busybox wget (-O /dev/null, not --spider which is GNU-only)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9100/metrics || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 32m
+    cpus: 0.1
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: bodhi-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://bodhi:${POSTGRES_PASSWORD}@postgres:5432/bodhi?sslmode=disable"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9187/metrics || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 32m
+    cpus: 0.1
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: bodhi-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    # No healthcheck: image is distroless (no sh, wget, or curl).
+    # Prometheus scrape health is verified via smoke tests.
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 32m
+    cpus: 0.1
+
+  prometheus:
+    image: prom/prometheus:v3.9.1
+    container_name: bodhi-prometheus
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      # Hard cap at 4 GB — whichever limit is hit first wins.
+      # At 15 s scrape interval with ~8 targets this is roughly
+      # 6–12 months of data; the time limit will normally trigger first.
+      - '--storage.tsdb.retention.size=4GB'
+      - '--web.enable-lifecycle'
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 256m
+    cpus: 0.5
+
+  grafana:
+    image: grafana/grafana:12.3.3
+    container_name: bodhi-grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: http://localhost:3000
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana-datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      loki:
+        condition: service_started
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/health || exit 1"]
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 128m
+    cpus: 0.5
+
+  loki:
+    image: grafana/loki:3.6.6
+    container_name: bodhi-loki
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./monitoring/loki.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/config.yml
+    # No healthcheck: Loki uses a fully distroless image (no shell, no tools).
+    # Readiness is verified externally via smoke tests against :3100/ready.
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 256m
+    cpus: 0.5
+
+  promtail:
+    image: grafana/promtail:3.6.6
+    container_name: bodhi-promtail
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - promtail-data:/var/lib/promtail
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      loki:
+        condition: service_started
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 64m
+    cpus: 0.25
+
+# ──────────────────────────────────────────────
+# Networks
+# ──────────────────────────────────────────────
+
+networks:
+  bodhi-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+
+# ──────────────────────────────────────────────
+# Volumes
+# ──────────────────────────────────────────────
+
+volumes:
+  redis-data:
+  postgres-data:
+  neo4j-data:
+  neo4j-logs:
+  qdrant-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
+  promtail-data:

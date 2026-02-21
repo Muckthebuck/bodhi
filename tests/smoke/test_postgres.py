@@ -44,7 +44,7 @@ class TestPostgres:
         with pg_conn.cursor() as cur:
             cur.execute("SELECT key FROM settings")
             keys = {row[0] for row in cur.fetchall()}
-        required = {"personality", "voice", "screen", "character"}
+        required = {"emotion.personality", "voice", "screen", "character"}
         missing = required - keys
         assert not missing, f"Missing settings keys: {missing}"
 

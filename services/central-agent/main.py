@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import time
 import uuid
@@ -55,25 +56,30 @@ class InputResponse(BaseModel):
 
 async def _redis_subscriber() -> None:
     redis: Redis = _state["redis"]
-    channels = ["language.response", "emotion.state_changed", "memory.stored"]
     pubsub = redis.pubsub()
-    await pubsub.subscribe(*channels)
-    log.info("redis_subscriber_started", channels=channels)
+    # psubscribe for dynamic per-request response channels; plain subscribe for events
+    await pubsub.psubscribe("language.response.*")
+    await pubsub.subscribe("emotion.state_changed", "memory.stored")
+    log.info("redis_subscriber_started")
 
     async for message in pubsub.listen():
-        if message["type"] != "message":
+        msg_type: str = message["type"]
+        if msg_type not in ("message", "pmessage"):
             continue
         channel: str = message["channel"]
         data: str = message["data"]
 
-        if channel == "language.response":
-            # data format: "<request_id>:<response_text>"
-            parts = data.split(":", 1)
-            if len(parts) == 2:
-                request_id, response_text = parts
-                future: asyncio.Future | None = _state["pending_responses"].get(request_id)
-                if future and not future.done():
-                    future.set_result(response_text)
+        if channel.startswith("language.response."):
+            # channel = language.response.<request_id>
+            request_id = channel[len("language.response."):]
+            try:
+                payload = json.loads(data)
+                response_text = payload.get("response", json.dumps(payload))
+            except Exception:
+                response_text = data
+            future: asyncio.Future | None = _state["pending_responses"].get(request_id)
+            if future and not future.done():
+                future.set_result(response_text)
 
         elif channel == "emotion.state_changed":
             log.info("emotion_state_changed", data=data)
@@ -191,7 +197,7 @@ async def handle_input(body: InputRequest, request: Request) -> InputResponse:
     future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
     _state["pending_responses"][request_id] = future
 
-    payload = f"{request_id}:{body.session_id}:{body.text}"
+    payload = json.dumps({"request_id": request_id, "session_id": body.session_id, "text": body.text})
     try:
         await _state["redis"].publish("user.input", payload)
         log.info("input_published", request_id=request_id, session_id=body.session_id)

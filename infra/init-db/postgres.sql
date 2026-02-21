@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 INSERT INTO settings (key, value) VALUES
-    ('personality', '{
+    ('emotion.personality', '{
         "openness": 0.7,
         "conscientiousness": 0.8,
         "extraversion": 0.6,

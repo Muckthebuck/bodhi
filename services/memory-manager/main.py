@@ -44,6 +44,7 @@ _pg_pool: asyncpg.Pool | None = None
 _qdrant: AsyncQdrantClient | None = None
 _embedder = None
 _embedder_lock = asyncio.Lock()
+_consolidation_lock = asyncio.Lock()  # prevents concurrent consolidation runs
 
 
 def _get_embedder():
@@ -107,44 +108,56 @@ async def _consolidation_loop() -> None:
 
 
 async def _run_consolidation() -> None:
-    t0 = time.perf_counter()
-    consolidated = 0
-    try:
-        keys = await _redis.keys("working_memory:*")
-        for key in keys:
-            raw = await _redis.get(key)
-            if raw is None:
-                continue
-            try:
-                entry = json.loads(raw)
-            except Exception:
-                continue
-            if entry.get("importance", 0) <= 0.7:
-                continue
-            try:
-                await _store_episodic(
-                    content=entry["content"],
-                    session_id=entry.get("session_id", ""),
-                    importance=entry.get("importance", 0.5),
-                    metadata=entry.get("metadata", {}),
-                )
-                await _store_semantic(
-                    content=entry["content"],
-                    session_id=entry.get("session_id", ""),
-                    importance=entry.get("importance", 0.5),
-                    metadata=entry.get("metadata", {}),
-                )
-                await _redis.delete(key)
-                consolidated += 1
-            except Exception as exc:
-                log.warning("consolidation_entry_failed", key=key, error=str(exc))
-        metrics.consolidation_runs_total.inc()
-        metrics.memory_latency_seconds.labels(operation="consolidation").observe(
-            time.perf_counter() - t0
-        )
-        log.info("consolidation_complete", consolidated=consolidated)
-    except Exception as exc:
-        log.error("consolidation_failed", error=str(exc))
+    if _consolidation_lock.locked():
+        log.info("consolidation_already_running_skipped")
+        return
+    async with _consolidation_lock:
+        t0 = time.perf_counter()
+        consolidated = 0
+        try:
+            # SCAN is non-blocking; KEYS would freeze Redis for all services
+            keys: list[str] = []
+            cursor = 0
+            while True:
+                cursor, partial = await _redis.scan(cursor, match="working_memory:*", count=100)
+                keys.extend(partial)
+                if cursor == 0:
+                    break
+
+            for key in keys:
+                raw = await _redis.get(key)
+                if raw is None:
+                    continue
+                try:
+                    entry = json.loads(raw)
+                except Exception:
+                    continue
+                if entry.get("importance", 0) <= 0.7:
+                    continue
+                try:
+                    await _store_episodic(
+                        content=entry["content"],
+                        session_id=entry.get("session_id", ""),
+                        importance=entry.get("importance", 0.5),
+                        metadata=entry.get("metadata", {}),
+                    )
+                    await _store_semantic(
+                        content=entry["content"],
+                        session_id=entry.get("session_id", ""),
+                        importance=entry.get("importance", 0.5),
+                        metadata=entry.get("metadata", {}),
+                    )
+                    await _redis.delete(key)
+                    consolidated += 1
+                except Exception as exc:
+                    log.warning("consolidation_entry_failed", key=key, error=str(exc))
+            metrics.consolidation_runs_total.inc()
+            metrics.memory_latency_seconds.labels(operation="consolidation").observe(
+                time.perf_counter() - t0
+            )
+            log.info("consolidation_complete", consolidated=consolidated)
+        except Exception as exc:
+            log.error("consolidation_failed", error=str(exc))
 
 
 async def _store_episodic(
@@ -192,6 +205,7 @@ async def _store_semantic(
                         "content": content,
                         "session_id": session_id,
                         "importance": importance,
+                        "memory_type": "semantic",
                         "metadata": metadata,
                     },
                 )
@@ -203,7 +217,7 @@ async def _store_semantic(
         )
     except Exception as exc:
         log.warning("qdrant_store_failed_fallback_postgres", error=str(exc))
-        await _store_episodic(content, session_id, importance, metadata)
+        return await _store_episodic(content, session_id, importance, metadata)
     return point_id
 
 

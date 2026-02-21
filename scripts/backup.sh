@@ -46,10 +46,23 @@ docker compose exec -T postgres \
   pg_dump -U bodhi bodhi > "$BACKUP_DIR/postgres.sql"
 ok "PostgreSQL"
 
-# Neo4j
+# Neo4j — Community Edition requires the database offline for a consistent dump.
+# Stop the neo4j server process (not the container), dump, then always restart.
 echo "  Backing up Neo4j..."
-docker compose exec -T neo4j \
-  neo4j-admin database dump neo4j --to-stdout > "$BACKUP_DIR/neo4j.dump" 2>/dev/null
+trap 'docker compose exec -T neo4j neo4j start 2>/dev/null || true' EXIT
+docker compose exec -T neo4j neo4j stop
+_neo4j_dump_ok=false
+if docker compose exec -T neo4j \
+     neo4j-admin database dump neo4j --to-stdout > "$BACKUP_DIR/neo4j.dump" 2>&1; then
+  _neo4j_dump_ok=true
+fi
+docker compose exec -T neo4j neo4j start
+trap - EXIT  # clear the trap once we've restarted successfully
+if ! $_neo4j_dump_ok; then
+  error "Neo4j dump failed — aborting backup"
+  rm -rf "$BACKUP_DIR"
+  exit 1
+fi
 ok "Neo4j"
 
 # Qdrant (copy storage directory)

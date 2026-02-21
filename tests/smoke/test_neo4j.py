@@ -1,4 +1,5 @@
 """Smoke tests — Neo4j constraints, indexes, and seed data"""
+
 import pytest
 
 
@@ -52,6 +53,7 @@ class TestNeo4j:
     def test_skill_id_uniqueness_enforced(self, neo4j_driver):
         """Inserting two Skills with the same skill_id must raise a constraint error."""
         from neo4j.exceptions import ClientError
+
         with neo4j_driver.session() as s:
             # Explicit tx1: create the first node and commit
             tx1 = s.begin_transaction()

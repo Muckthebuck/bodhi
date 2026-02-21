@@ -1,10 +1,13 @@
 """Smoke tests — Qdrant vector store"""
+
+import os
+
 import pytest
 
 
 @pytest.mark.smoke
 class TestQdrant:
-    BASE = "http://localhost:6333"
+    BASE = os.getenv("QDRANT_URL", "http://localhost:6333")
 
     def test_healthz(self, http):
         r = http.get(f"{self.BASE}/healthz")

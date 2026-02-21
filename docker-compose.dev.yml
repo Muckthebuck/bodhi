@@ -2,29 +2,18 @@
 # ============================================================
 # Bodhi — Development Overrides
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#
+# Design: internal services (agents, Redis, Postgres, Neo4j, Qdrant, etc.)
+# stay on the private bodhi-network and are NOT exposed to the host.
+# Only Grafana and Prometheus are exposed for dashboards/debugging.
+# Use the `test-runner` profile to run smoke tests inside the network:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml \
+#     --env-file tests/files/.env.test run --rm test-runner
 # ============================================================
 
 services:
 
-  # Expose all ports locally for debugging
-  postgres:
-    ports:
-      - "5432:5432"
-
-  neo4j:
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-
-  qdrant:
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-
-  redis:
-    ports:
-      - "6379:6379"
-
+  # ── External-facing UI ────────────────────────────────────────────────────
   prometheus:
     ports:
       - "9090:9090"
@@ -34,3 +23,51 @@ services:
       - "3000:3000"
     environment:
       GF_LOG_LEVEL: debug
+
+  # ── Test runner (profile=test) ────────────────────────────────────────────
+  # Runs inside bodhi-network so it reaches all services by container name.
+  # Activated only with --profile test so it doesn't start on normal `up`.
+  test-runner:
+    image: python:3.11-slim
+    container_name: bodhi-test-runner
+    profiles:
+      - test
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    environment:
+      # Credentials
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      # Infra hosts (Docker service names)
+      - REDIS_HOST=redis
+      - POSTGRES_HOST=postgres
+      - NEO4J_HOST=neo4j
+      # Agent service URLs (Docker container names on bodhi-network)
+      - CENTRAL_AGENT_URL=http://bodhi-central-agent:8000
+      - MEMORY_MANAGER_URL=http://bodhi-memory-manager:8001
+      - LANGUAGE_CENTER_URL=http://bodhi-language-center:8002
+      - EMOTION_REGULATOR_URL=http://bodhi-emotion-regulator:8003
+      # Infra service URLs
+      - QDRANT_URL=http://qdrant:6333
+      - PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_URL=http://grafana:3000
+      - LOKI_URL=http://loki:3100
+      - NODE_EXPORTER_URL=http://node-exporter:9100
+    command:
+      - sh
+      - -c
+      - |
+        pip install -r tests/requirements-test.txt -q --break-system-packages
+        pytest tests/smoke/ -v -m smoke "$@"
+    networks:
+      - bodhi-network
+    depends_on:
+      central-agent:
+        condition: service_healthy
+      memory-manager:
+        condition: service_healthy
+      language-center:
+        condition: service_healthy
+      emotion-regulator:
+        condition: service_healthy

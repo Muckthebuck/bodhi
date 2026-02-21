@@ -1,0 +1,22 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I"]
+ignore = [
+    "E501",  # line-too-long: enforced at 100 chars but many long strings/comments are unavoidable
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["F401"]  # test files commonly re-export fixtures via imports
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_return_any = false
+no_implicit_optional = true
+# union-attr: _state dict values are Optional by type but guaranteed non-None after
+# lifespan startup; guarding every usage would obscure the business logic.
+disable_error_code = ["union-attr"]

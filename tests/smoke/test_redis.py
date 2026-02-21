@@ -1,4 +1,5 @@
 """Smoke tests — Redis"""
+
 import pytest
 
 

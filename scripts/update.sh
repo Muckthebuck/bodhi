@@ -43,7 +43,7 @@ CHANGED=$(git diff --name-only "${PRE_PULL}"..HEAD)
 # Restart infrastructure only if the production compose file changed.
 # Deliberately excludes docker-compose.dev.yml — dev overrides should
 # not trigger production restarts.
-if echo "$CHANGED" | grep -qx "docker-compose.yml"; then
+if echo "$CHANGED" | grep -qE '^docker-compose\.yml$'; then
   warn "docker-compose.yml changed — restarting infrastructure"
   docker compose up -d redis postgres neo4j qdrant
 fi

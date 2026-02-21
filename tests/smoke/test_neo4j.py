@@ -48,3 +48,16 @@ class TestNeo4j:
                 RETURN count(*) AS cnt
             """)
             assert result.single()["cnt"] >= 1, "No Skill→Category relationships found"
+
+    def test_skill_id_uniqueness_enforced(self, neo4j_driver):
+        """Inserting two Skills with the same skill_id must raise a constraint error."""
+        from neo4j.exceptions import ClientError
+        with neo4j_driver.session() as s:
+            s.run("CREATE (:Skill {skill_id: '__smoke_dup_test__', name: 'a'})")
+            try:
+                s.run("CREATE (:Skill {skill_id: '__smoke_dup_test__', name: 'b'})")
+                assert False, "Expected uniqueness constraint violation"
+            except ClientError as e:
+                assert "ConstraintValidationFailed" in str(e) or "already exists" in str(e).lower()
+            finally:
+                s.run("MATCH (s:Skill {skill_id: '__smoke_dup_test__'}) DELETE s")

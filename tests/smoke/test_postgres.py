@@ -40,9 +40,34 @@ class TestPostgres:
             count = cur.fetchone()[0]
         assert count > 0, "settings table is empty — seed data missing"
 
+    def test_settings_required_keys(self, pg_conn):
+        with pg_conn.cursor() as cur:
+            cur.execute("SELECT key FROM settings")
+            keys = {row[0] for row in cur.fetchall()}
+        required = {"personality", "voice", "screen", "character"}
+        missing = required - keys
+        assert not missing, f"Missing settings keys: {missing}"
+
+    def test_skill_executions_fk_enforced(self, pg_conn):
+        """skill_executions.skill_id must reference skills.skill_id."""
+        import psycopg2
+        with pg_conn.cursor() as cur:
+            try:
+                cur.execute("""
+                    INSERT INTO skill_executions (skill_id, status)
+                    VALUES ('__nonexistent_skill__', 'success')
+                """)
+                pg_conn.rollback()
+                assert False, "FK violation should have been raised"
+            except psycopg2.errors.ForeignKeyViolation:
+                pg_conn.rollback()  # expected — FK is enforced
+
     @pytest.mark.parametrize("table,col", [
         ("memories", "id"),
         ("skills", "id"),
+        ("skill_executions", "id"),
+        ("tool_permissions", "id"),
+        ("tool_audit_log", "id"),
         ("conversations", "id"),
     ])
     def test_uuid_primary_keys(self, pg_conn, table, col):

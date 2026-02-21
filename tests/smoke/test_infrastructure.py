@@ -68,6 +68,23 @@ class TestComposeConfig:
 
 
 @pytest.mark.smoke
+class TestScriptSyntax:
+    """Shell scripts must pass bash -n (no syntax errors)."""
+
+    SCRIPTS = ["scripts/setup.sh", "scripts/update.sh", "scripts/backup.sh"]
+
+    @pytest.mark.parametrize("script", SCRIPTS)
+    def test_script_syntax(self, script):
+        r = _run(["bash", "-n", script])
+        assert r.returncode == 0, f"{script} has syntax errors:\n{r.stderr}"
+
+    @pytest.mark.parametrize("script", SCRIPTS)
+    def test_script_is_executable(self, script):
+        path = ROOT / script
+        assert path.stat().st_mode & 0o111, f"{script} is not executable"
+
+
+@pytest.mark.smoke
 class TestAllServicesHealthy:
     INFRA_SERVICES = ["redis", "postgres", "neo4j", "qdrant"]
 

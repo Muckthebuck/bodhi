@@ -30,7 +30,7 @@ ok "Code updated"
 docker compose pull --quiet
 ok "Images pulled"
 
-# Run DB migrations if any exist
+# Run DB migrations if any exist (this file is not yet created; guard is intentional)
 if [ -f "infra/migrate.sh" ]; then
   echo "  Running migrations..."
   bash infra/migrate.sh

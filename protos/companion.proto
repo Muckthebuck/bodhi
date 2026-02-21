@@ -19,7 +19,7 @@ option java_package = "com.bodhi.proto";
 // ──────────────────────────────────────────────────────────────
 
 service ClientService {
-  // Capture and analyse client screen (on-demand only)
+  // Capture and analyze client screen (on-demand only)
   rpc CaptureScreen     (ScreenCaptureRequest)     returns (ScreenCaptureResponse);
 
   // Send voice transcript from client STT to host

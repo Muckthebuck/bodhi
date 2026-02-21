@@ -94,7 +94,14 @@ class TestAllServicesHealthy:
         r = _run(["docker", "compose", "ps", "--format", "json", service])
         assert r.returncode == 0, f"docker compose ps failed for {service}:\n{r.stderr}"
 
-        rows = [json.loads(line) for line in r.stdout.splitlines() if line.strip()]
+        # Compose v2 may output either a JSON array or newline-delimited objects
+        stdout = r.stdout.strip()
+        assert stdout, f"No container data returned for service '{service}' — is it running?"
+        try:
+            parsed = json.loads(stdout)
+            rows = parsed if isinstance(parsed, list) else [parsed]
+        except json.JSONDecodeError:
+            rows = [json.loads(line) for line in stdout.splitlines() if line.strip()]
         assert rows, f"No container data returned for service '{service}' — is it running?"
 
         for data in rows:

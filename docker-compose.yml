@@ -81,7 +81,6 @@ services:
     volumes:
       - neo4j-data:/data
       - neo4j-logs:/logs
-      - ./infra/init-db/neo4j.cypher:/docker-entrypoint-initdb.d/init.cypher:ro
     healthcheck:
       <<: *healthcheck-defaults
       test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
@@ -91,6 +90,20 @@ services:
     logging: *default-logging
     mem_limit: 1g
     cpus: 1.0
+
+  neo4j-init:
+    image: neo4j:5-community
+    container_name: bodhi-neo4j-init
+    restart: "no"
+    volumes:
+      - ./infra/init-db/neo4j.cypher:/init.cypher:ro
+    command: ["cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD}", "-a", "bolt://neo4j:7687", "--file", "/init.cypher"]
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    networks:
+      - bodhi-network
+    logging: *default-logging
 
   qdrant:
     image: qdrant/qdrant:v1.17.0

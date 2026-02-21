@@ -193,6 +193,10 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=30d'
+      # Hard cap at 4 GB — whichever limit is hit first wins.
+      # At 15 s scrape interval with ~8 targets this is roughly
+      # 6–12 months of data; the time limit will normally trigger first.
+      - '--storage.tsdb.retention.size=4GB'
       - '--web.enable-lifecycle'
     healthcheck:
       <<: *healthcheck-defaults

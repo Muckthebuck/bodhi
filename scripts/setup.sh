@@ -21,6 +21,15 @@ echo "║        Bodhi — Setup                 ║"
 echo "╚══════════════════════════════════════╝"
 echo ""
 
+# ── OS guard ─────────────────────────────────────────────────
+# Bodhi targets Linux hosts (Raspberry Pi 5, x86-64 servers).
+# /proc/meminfo and other Linux-specific APIs are used below.
+if [ "$(uname -s)" != "Linux" ]; then
+  err "This script requires Linux. Detected: $(uname -s)
+  For development on macOS/Windows use Docker Desktop and run
+  'docker compose up -d' directly."
+fi
+
 # ── Architecture detect ──────────────────────────────────────
 ARCH=$(uname -m)
 case "$ARCH" in

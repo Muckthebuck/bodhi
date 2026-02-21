@@ -96,18 +96,32 @@ info "Starting infrastructure services..."
 docker compose up -d redis postgres neo4j qdrant
 
 info "Waiting for databases to be healthy..."
-timeout 120 bash -c '
-  until docker compose ps --format json | python3 -c "
-import sys, json
-services = [json.loads(l) for l in sys.stdin if l.strip()]
-infra = [s for s in services if s[\"Service\"] in [\"redis\",\"postgres\",\"neo4j\",\"qdrant\"]]
-all_healthy = all(s.get(\"Health\",\"\") in [\"healthy\",\"\"] for s in infra)
-sys.exit(0 if all_healthy else 1)
-" 2>/dev/null; do
-    echo -n "."
-    sleep 3
+# docker inspect is universally available; avoids relying on
+# 'docker compose ps --format json' (Compose v2.7+) or python3.
+_WAIT=0
+while true; do
+  _all=true
+  for _svc in redis postgres neo4j qdrant; do
+    _cid=$(docker compose ps -q "$_svc" 2>/dev/null | head -1)
+    if [ -z "$_cid" ]; then
+      _all=false; break
+    fi
+    _status=$(docker inspect --format '{{.State.Health.Status}}' "$_cid" 2>/dev/null)
+    if [ "$_status" != "healthy" ]; then
+      _all=false; break
+    fi
   done
-'
+  $_all && break
+  if [ "$_WAIT" -ge 120 ]; then
+    echo ""
+    error "Timed out waiting for databases to become healthy"
+    docker compose ps
+    exit 1
+  fi
+  echo -n "."
+  sleep 3
+  _WAIT=$((_WAIT + 3))
+done
 ok "Databases healthy"
 
 # ── Start monitoring ─────────────────────────────────────────

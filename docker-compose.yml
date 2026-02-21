@@ -136,6 +136,36 @@ services:
     mem_limit: 32m
     cpus: 0.1
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: bodhi-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://bodhi:${POSTGRES_PASSWORD}@postgres:5432/bodhi?sslmode=disable"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 32m
+    cpus: 0.1
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: bodhi-redis-exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - bodhi-network
+    logging: *default-logging
+    mem_limit: 32m
+    cpus: 0.1
+
   prometheus:
     image: prom/prometheus:v3.9.1
     container_name: bodhi-prometheus

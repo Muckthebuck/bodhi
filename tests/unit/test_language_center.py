@@ -44,7 +44,7 @@ class TestClassifyIntent:
         assert _classify_intent("do you remember when we talked about Paris?")[0] == "query.memory"
 
     def test_system_status(self):
-        assert _classify_intent("how are you doing?")[0] == "system.status"
+        assert _classify_intent("what is your status?")[0] == "system.status"
 
     def test_system_shutdown_goodnight(self):
         assert _classify_intent("goodnight")[0] == "system.shutdown"

@@ -31,44 +31,29 @@ class TestInputRequestValidation:
 class TestPendingResponseFutures:
     """Test the in-process request/response tracking pattern."""
 
-    def test_future_resolved_by_subscriber(self):
+    async def test_future_resolved_by_subscriber(self):
         pending: dict[str, asyncio.Future] = {}
-
-        async def _run():
-            loop = asyncio.get_event_loop()
-            request_id = "req-123"
-            future: asyncio.Future = loop.create_future()
-            pending[request_id] = future
-
-            # Simulate subscriber resolving it
-            pending[request_id].set_result("hello back")
-
-            result = await asyncio.wait_for(future, timeout=1.0)
-            return result
-
-        result = asyncio.run(_run())
+        loop = asyncio.get_event_loop()
+        request_id = "req-123"
+        future: asyncio.Future = loop.create_future()
+        pending[request_id] = future
+        pending[request_id].set_result("hello back")
+        result = await asyncio.wait_for(future, timeout=1.0)
         assert result == "hello back"
 
-    def test_future_times_out(self):
-        async def _run():
-            loop = asyncio.get_event_loop()
-            future: asyncio.Future = loop.create_future()
-            with pytest.raises(asyncio.TimeoutError):
-                await asyncio.wait_for(future, timeout=0.05)
+    async def test_future_times_out(self):
+        loop = asyncio.get_event_loop()
+        future: asyncio.Future = loop.create_future()
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(future, timeout=0.05)
 
-        asyncio.run(_run())
-
-    def test_future_not_set_twice(self):
-        async def _run():
-            loop = asyncio.get_event_loop()
-            future: asyncio.Future = loop.create_future()
-            future.set_result("first")
-            # Second set must be guarded with done() check
-            if not future.done():
-                future.set_result("second")
-            return await future
-
-        result = asyncio.run(_run())
+    async def test_future_not_set_twice(self):
+        loop = asyncio.get_event_loop()
+        future: asyncio.Future = loop.create_future()
+        future.set_result("first")
+        if not future.done():
+            future.set_result("second")
+        result = await future
         assert result == "first"
 
 
@@ -103,7 +88,6 @@ class TestStatusResponse:
     """Test the /status endpoint shape without starting the app."""
 
     def test_status_shape(self):
-        # Mirrors the _state dict structure used in /status endpoint
         state = {
             "active_agents": {"language-center", "emotion-regulator"},
             "redis": object(),

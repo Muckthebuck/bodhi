@@ -87,15 +87,24 @@ class TestIntentParaphraseRobustness:
         assert intent == "system.shutdown", f"'{text}' → expected system.shutdown, got {intent}"
 
     @pytest.mark.parametrize("text", [
-        "how are you?",
-        "how are you doing?",
         "are you ok?",
-        "how are you feeling?",
         "what's your status?",
+        "system status",
+        "what is your status?",
     ])
     def test_status_paraphrases(self, text):
         intent, _ = _classify_intent(text)
         assert intent == "system.status", f"'{text}' → expected system.status, got {intent}"
+
+    @pytest.mark.parametrize("text", [
+        "how are you?",
+        "how are you doing?",
+        "how are you feeling?",
+    ])
+    def test_greeting_how_are_you_maps_to_chitchat(self, text):
+        """'how are you' phrases are chitchat, not system.status (intentional behavior)."""
+        intent, _ = _classify_intent(text)
+        assert intent == "chitchat", f"'{text}' → expected chitchat, got {intent}"
 
     @pytest.mark.parametrize("text", [
         "do you remember when we talked?",

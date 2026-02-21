@@ -57,7 +57,8 @@ _INTENT_PATTERNS: list[tuple[str, list[re.Pattern[str]]]] = [
     (
         "system.shutdown",
         [
-            re.compile(r"\b(goodnight|good night|bye|goodbye|shutdown|shut down|sleep|see you)\b", re.I),
+            # Anchored to start so mid-sentence "I said goodnight" doesn't trigger shutdown
+            re.compile(r"^(goodnight|good night|bye|goodbye|shutdown|shut down|sleep|see you)\b", re.I),
         ],
     ),
     (
@@ -183,12 +184,14 @@ def _extract_entities(text: str) -> list[dict[str, str]]:
 def _analyse_sentiment(text: str) -> tuple[str, float]:
     pos = len(_SENTIMENT_POSITIVE.findall(text))
     neg = len(_SENTIMENT_NEGATIVE.findall(text))
-    total = pos + neg or 1
+    total = pos + neg
+    if total == 0:
+        return "neutral", 1.0  # No sentiment words → unambiguously neutral
     if pos > neg:
         return "positive", round(pos / total, 2)
     if neg > pos:
         return "negative", round(neg / total, 2)
-    return "neutral", 0.5
+    return "neutral", 0.5  # Equal pos/neg → ambiguous neutral
 
 
 # ---------------------------------------------------------------------------
@@ -329,9 +332,18 @@ async def _redis_subscriber(redis_client: aioredis.Redis) -> None:
             entities = _extract_entities(text)
             sentiment_label, sentiment_score = _analyse_sentiment(text)
 
+            # Use neutral defaults; Phase 3 will inject live emotion/personality context
+            _default_emotion = {"valence": 0.0, "arousal": 0.0, "label": sentiment_label}
+            _default_personality = {
+                "extraversion": 0.5, "agreeableness": 0.8,
+                "neuroticism": 0.2, "openness": 0.7, "conscientiousness": 0.6,
+            }
+            response_text = _generate_response(text, intent, _default_emotion, _default_personality)
+
             result = {
                 "request_id": request_id,
                 "session_id": session_id,
+                "response": response_text,
                 "intent": intent,
                 "intent_confidence": confidence,
                 "entities": entities,

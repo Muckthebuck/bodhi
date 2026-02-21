@@ -52,6 +52,11 @@ class TestClassifyIntent:
     def test_system_shutdown_bye(self):
         assert _classify_intent("goodbye, see you tomorrow")[0] == "system.shutdown"
 
+    def test_shutdown_mid_sentence_not_triggered(self):
+        """'goodnight' mid-sentence must NOT trigger shutdown (regex now anchored to ^)."""
+        intent, _ = _classify_intent("I said goodnight to my friend")
+        assert intent != "system.shutdown"
+
     def test_skill_execute(self):
         assert _classify_intent("run the backup skill")[0] == "skill.execute"
 

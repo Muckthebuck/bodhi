@@ -9,8 +9,7 @@ from typing import Any
 import asyncpg
 import structlog
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Request, Response
 from neo4j import AsyncGraphDatabase
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
@@ -39,6 +38,7 @@ _state: dict[str, Any] = {
     "pg_pool": None,
     "neo4j_driver": None,
     "active_agents": set(),
+    "agent_last_seen": {},   # {agent_name: float timestamp}
     "pending_responses": {},
 }
 
@@ -103,7 +103,17 @@ async def _heartbeat_watcher() -> None:
         try:
             channel: str = message["channel"]
             agent_name = channel.split(".")[-1]
+            now = time.time()
             _state["active_agents"].add(agent_name)
+            _state["agent_last_seen"][agent_name] = now
+
+            # Prune agents not seen for more than 60 seconds
+            stale = [n for n, ts in _state["agent_last_seen"].items() if now - ts > 60]
+            for n in stale:
+                _state["active_agents"].discard(n)
+                del _state["agent_last_seen"][n]
+                log.warning("agent_stale_removed", agent=n)
+
             metrics.active_agents.set(len(_state["active_agents"]))
         except Exception as exc:
             log.error("heartbeat_watcher_message_error", error=str(exc))
@@ -149,6 +159,7 @@ async def lifespan(app: FastAPI):
     log.info("central_agent_shutting_down")
     for task in background_tasks:
         task.cancel()
+    await asyncio.gather(*background_tasks, return_exceptions=True)
 
     if _state["redis"]:
         await _state["redis"].aclose()
@@ -202,26 +213,33 @@ async def handle_input(body: InputRequest, request: Request) -> InputResponse:
 
     if not _state["redis"]:
         metrics.requests_total.labels(status="error").inc()
-        return JSONResponse(status_code=503, content={"error": "redis unavailable"})
+        raise HTTPException(status_code=503, detail="Redis unavailable")
 
     future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
     _state["pending_responses"][request_id] = future
 
     payload = json.dumps({"request_id": request_id, "session_id": body.session_id, "text": body.text})
     try:
-        await asyncio.wait_for(
-            _state["redis"].publish("user.input", payload),
-            timeout=2.0,
-        )
+        try:
+            await asyncio.wait_for(
+                _state["redis"].publish("user.input", payload),
+                timeout=2.0,
+            )
+        except asyncio.TimeoutError:
+            log.error("publish_timeout", request_id=request_id)
+            metrics.requests_total.labels(status="error").inc()
+            return InputResponse(request_id=request_id, error="publish timeout")
+
         log.info("input_published", request_id=request_id, session_id=body.session_id)
 
-        response_text = await asyncio.wait_for(future, timeout=RESPONSE_TIMEOUT)
-        metrics.requests_total.labels(status="success").inc()
-        result = InputResponse(request_id=request_id, response=response_text)
-    except asyncio.TimeoutError:
-        log.warning("response_timeout", request_id=request_id)
-        metrics.requests_total.labels(status="timeout").inc()
-        result = InputResponse(request_id=request_id, error="timeout")
+        try:
+            response_text = await asyncio.wait_for(future, timeout=RESPONSE_TIMEOUT)
+            metrics.requests_total.labels(status="success").inc()
+            result = InputResponse(request_id=request_id, response=response_text)
+        except asyncio.TimeoutError:
+            log.warning("response_timeout", request_id=request_id)
+            metrics.requests_total.labels(status="timeout").inc()
+            result = InputResponse(request_id=request_id, error="timeout")
     except Exception as exc:
         log.error("input_handler_error", request_id=request_id, error=str(exc))
         metrics.requests_total.labels(status="error").inc()

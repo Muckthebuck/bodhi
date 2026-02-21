@@ -50,6 +50,12 @@ EVENT_EFFECTS: dict[str, dict[str, float]] = {
     "language.response":      {"valence": 0.0,  "arousal": -0.05, "dominance": 0.0},
 }
 
+# Validate at import time — before any I/O opens, so failures are clean with no leaks
+_valid_vad = {"valence", "arousal", "dominance"}
+for _event, _effects in EVENT_EFFECTS.items():
+    if set(_effects.keys()) != _valid_vad:
+        raise ValueError(f"EVENT_EFFECTS[{_event!r}] has invalid keys: {set(_effects.keys())}")
+
 DEFAULT_PERSONALITY: dict[str, float] = {
     "openness": 0.8,
     "conscientiousness": 0.7,
@@ -262,12 +268,6 @@ async def _redis_subscriber() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _redis_client, _db_pool
-
-    # Fail fast if EVENT_EFFECTS has any typo'd dimension keys
-    _valid_vad = {"valence", "arousal", "dominance"}
-    for _event, _effects in EVENT_EFFECTS.items():
-        if set(_effects.keys()) != _valid_vad:
-            raise ValueError(f"EVENT_EFFECTS[{_event!r}] has invalid keys: {set(_effects.keys())}")
 
     _redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
     log.info("redis_connected", url=REDIS_URL)

@@ -118,19 +118,27 @@ async def _run_consolidation() -> None:
         t0 = time.perf_counter()
         consolidated = 0
         try:
-            # SCAN is non-blocking; KEYS would freeze Redis for all services
+            # SCAN is non-blocking; KEYS would freeze Redis for all services.
+            # Overall timeout prevents the lock being held if Redis stalls.
             keys: list[str] = []
-            cursor = 0
-            max_iterations = 500
-            iteration = 0
-            while True:
-                cursor, partial = await _redis.scan(cursor, match="working_memory:*", count=1000)
-                keys.extend(partial)
-                iteration += 1
-                if cursor == 0 or iteration >= max_iterations:
-                    break
-            if iteration >= max_iterations:
-                log.warning("consolidation_scan_truncated", keys_found=len(keys))
+            try:
+                async with asyncio.timeout(60):
+                    cursor = 0
+                    max_iterations = 500
+                    iteration = 0
+                    while True:
+                        cursor, partial = await _redis.scan(cursor, match="working_memory:*", count=1000)
+                        keys.extend(partial)
+                        iteration += 1
+                        if cursor == 0 or iteration >= max_iterations:
+                            break
+                    if iteration >= max_iterations:
+                        log.warning("consolidation_scan_truncated", keys_found=len(keys))
+            except asyncio.TimeoutError:
+                log.warning("consolidation_scan_timeout", keys_found=len(keys))
+
+            # Deduplicate — Redis SCAN can return the same key twice if keyspace changes mid-scan
+            keys = list(set(keys))
 
             for key in keys:
                 raw = await _redis.get(key)
@@ -143,6 +151,7 @@ async def _run_consolidation() -> None:
                 if entry.get("importance", 0) <= 0.7:
                     continue
 
+                # Store episodic first; on failure keep working memory for next run.
                 try:
                     await _store_episodic(
                         content=entry["content"],
@@ -150,6 +159,13 @@ async def _run_consolidation() -> None:
                         importance=entry.get("importance", 0.5),
                         metadata=entry.get("metadata", {}),
                     )
+                except Exception as exc:
+                    log.warning("consolidation_episodic_failed", key=key, error=str(exc))
+                    continue  # keep working memory; retry on next consolidation run
+
+                # Episodic succeeded; attempt semantic. Failure is non-fatal — still delete
+                # the working memory key to prevent duplicate episodic inserts.
+                try:
                     await _store_semantic(
                         content=entry["content"],
                         session_id=entry.get("session_id", ""),
@@ -157,12 +173,11 @@ async def _run_consolidation() -> None:
                         metadata=entry.get("metadata", {}),
                     )
                 except Exception as exc:
-                    log.warning("consolidation_store_failed", key=key, error=str(exc))
-                    continue  # keep working memory; retry on next consolidation run
+                    log.warning("consolidation_semantic_failed", key=key, error=str(exc))
+                    # Fall through to delete — episodic is the source of truth
 
-                # Both stores succeeded — remove from working set.
-                # On delete failure, set a short TTL (<< CONSOLIDATION_INTERVAL) so the
-                # key expires before next run, preventing duplicate storage.
+                # Remove from working set. On delete failure set a short TTL so the key
+                # expires before the next 30-min consolidation run.
                 try:
                     await _redis.delete(key)
                 except Exception as del_exc:
@@ -263,6 +278,7 @@ async def lifespan(app: FastAPI):
 
     consolidation_task.cancel()
     subscriber_task.cancel()
+    await asyncio.gather(consolidation_task, subscriber_task, return_exceptions=True)
     await _redis.aclose()
     await _pg_pool.close()
     await _qdrant.close()

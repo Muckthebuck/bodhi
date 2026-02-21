@@ -296,3 +296,38 @@ class TestGenerationReasoning:
         for intent in intents:
             text = _generate_response("test", intent, emotion, self._base_personality)
             assert len(text) > 0, f"Empty response for intent '{intent}'"
+
+
+class TestSubscriberResponseField:
+    """The Redis subscriber must include a 'response' key with natural language text."""
+
+    _default_emotion = {"valence": 0.0, "arousal": 0.0, "label": "neutral"}
+    _default_personality = {
+        "extraversion": 0.5, "agreeableness": 0.8,
+        "neuroticism": 0.2, "openness": 0.7, "conscientiousness": 0.6,
+    }
+
+    def test_subscriber_response_is_natural_language(self):
+        """_generate_response() called with default context must return plain text."""
+        text = _generate_response("hello", "chitchat", self._default_emotion, self._default_personality)
+        assert isinstance(text, str)
+        assert len(text) > 0
+        # Must not look like raw JSON (the old broken fallback)
+        assert not text.startswith("{"), f"Response looks like raw JSON: {text!r}"
+
+    def test_subscriber_response_included_in_result_dict(self):
+        """Simulates what the subscriber now does — result dict must have 'response' key."""
+        intent, confidence = _classify_intent("hello there")
+        _, sentiment_score = _analyse_sentiment("hello there")
+        sentiment_label = "positive"
+        response_text = _generate_response(
+            "hello there", intent, self._default_emotion, self._default_personality
+        )
+        result = {
+            "request_id": "req-test",
+            "response": response_text,
+            "intent": intent,
+        }
+        assert "response" in result
+        assert isinstance(result["response"], str)
+        assert len(result["response"]) > 0

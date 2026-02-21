@@ -102,7 +102,9 @@ class TestConsolidationStoreFault:
         # delete must not have been called — working memory survives
         mock_redis.delete.assert_called_once_with(_main._CONSOLIDATION_LOCK_KEY)
 
-    async def test_semantic_store_failure_does_not_delete_key(self):
+    async def test_semantic_store_failure_still_deletes_key(self):
+        """If episodic succeeds but semantic fails, working memory MUST still be deleted
+        to prevent duplicate episodic inserts on the next consolidation run."""
         mock_redis = AsyncMock()
         mock_redis.set.return_value = True
         mock_redis.scan.return_value = (0, ["working_memory:s1:abc"])
@@ -120,8 +122,12 @@ class TestConsolidationStoreFault:
         ):
             await _main._run_consolidation()
 
-        # only lock release delete — not the working memory key
-        mock_redis.delete.assert_called_once_with(_main._CONSOLIDATION_LOCK_KEY)
+        # Working memory key deleted despite semantic failure (episodic is source of truth)
+        # delete called twice: working memory key + lock release
+        assert mock_redis.delete.call_count == 2
+        deleted_keys = [c.args[0] for c in mock_redis.delete.call_args_list]
+        assert "working_memory:s1:abc" in deleted_keys
+        assert _main._CONSOLIDATION_LOCK_KEY in deleted_keys
 
 
 # ---------------------------------------------------------------------------
@@ -182,7 +188,8 @@ class TestConsolidationLock:
         mock_redis.delete.assert_not_called()
 
     async def test_lock_acquired_runs_scan(self):
-        """When set(nx=True) returns True, consolidation proceeds to scan."""
+        """When set(nx=True) returns True, consolidation proceeds to scan.
+        Also verifies the correct TTL is passed to prevent premature lock expiry."""
         mock_redis = AsyncMock()
         mock_redis.set.return_value = True  # lock acquired
         mock_redis.scan.return_value = (0, [])  # no keys — nothing to consolidate
@@ -190,6 +197,9 @@ class TestConsolidationLock:
         with patch.object(_main, "_redis", mock_redis):
             await _main._run_consolidation()
 
+        mock_redis.set.assert_called_once_with(
+            _main._CONSOLIDATION_LOCK_KEY, "1", nx=True, ex=_main._CONSOLIDATION_LOCK_TTL
+        )
         mock_redis.scan.assert_called_once()
 
     async def test_lock_always_released_even_on_exception(self):

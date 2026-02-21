@@ -56,6 +56,20 @@ class TestApplyEventConcurrency:
         for dim, val in _er.vad_target.items():
             assert -1.0 <= val <= 1.0, f"{dim}={val} out of clamp range"
 
+    async def test_publish_failure_does_not_crash_apply_event(self):
+        """If Redis publish raises ConnectionError, _apply_event must not propagate it.
+        The emotion update is applied; only the broadcast is lost."""
+        _er.vad_target.update(dict(_er.BASELINE))
+        mock_redis = AsyncMock()
+        mock_redis.publish.side_effect = ConnectionError("Redis down")
+
+        with patch.object(_er, "_redis_client", mock_redis):
+            # Must not raise
+            await _er._apply_event("user.positive_feedback", 1.0)
+
+        # VAD target was still updated despite publish failure
+        assert _er.vad_target["valence"] > _er.BASELINE["valence"]
+
 
 # ---------------------------------------------------------------------------
 # Emotion-regulator: personality read/write concurrency

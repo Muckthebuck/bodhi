@@ -3,7 +3,6 @@ Infrastructure validation tests — invokes shell checks as subprocesses.
 These verify the compose/config files are correct before any service starts.
 """
 import subprocess
-import shutil
 import pytest
 from pathlib import Path
 
@@ -46,19 +45,25 @@ class TestComposeConfig:
         assert not missing, f"Keys missing from .env.example: {missing}"
 
     def test_prometheus_config_valid(self):
-        """`promtool check config` must pass on prometheus.yml."""
-        promtool = shutil.which("promtool")
-        if promtool is None:
-            pytest.skip("promtool not installed")
-        r = _run([promtool, "check", "config", "monitoring/prometheus.yml"])
-        assert r.returncode == 0, f"promtool check failed:\n{r.stderr}"
+        """`promtool check config` via Docker — no host install required."""
+        r = _run([
+            "docker", "run", "--rm",
+            "--entrypoint", "/bin/promtool",
+            "-v", f"{ROOT}/monitoring:/etc/prometheus:ro",
+            "prom/prometheus:v3.9.1",
+            "check", "config", "/etc/prometheus/prometheus.yml",
+        ])
+        assert r.returncode == 0, f"promtool check config failed:\n{r.stderr}"
 
     def test_alert_rules_valid(self):
-        """`promtool check rules` must pass on alerts.yml."""
-        promtool = shutil.which("promtool")
-        if promtool is None:
-            pytest.skip("promtool not installed")
-        r = _run([promtool, "check", "rules", "monitoring/alerts.yml"])
+        """`promtool check rules` via Docker — no host install required."""
+        r = _run([
+            "docker", "run", "--rm",
+            "--entrypoint", "/bin/promtool",
+            "-v", f"{ROOT}/monitoring:/etc/prometheus:ro",
+            "prom/prometheus:v3.9.1",
+            "check", "rules", "/etc/prometheus/alerts.yml",
+        ])
         assert r.returncode == 0, f"promtool check rules failed:\n{r.stderr}"
 
 

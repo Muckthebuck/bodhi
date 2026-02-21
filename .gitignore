@@ -1,0 +1,71 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Secrets & Certificates
+certs/
+*.key
+*.pem
+*.p12
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.npm
+
+# Go
+*.exe
+*.test
+vendor/
+
+# Docker
+.docker/
+
+# Models (large binary files)
+models/
+*.bin
+*.gguf
+*.onnx
+*.pt
+*.pth
+*.safetensors
+
+# Data & Databases
+backups/
+data/
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Monitoring data
+prometheus-data/
+grafana-data/
+
+# Session state
+session-state/

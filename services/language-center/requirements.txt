@@ -1,0 +1,9 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+redis[hiredis]==5.2.1
+transformers==4.48.3
+torch==2.6.0
+prometheus-client==0.21.1
+pydantic==2.10.5
+python-dotenv==1.0.1
+structlog==24.4.0

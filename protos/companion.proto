@@ -152,7 +152,7 @@ message HostEvent {
 
 
 // ──────────────────────────────────────────────────────────────
-// Internal Agent Service
+// Internal Agent Service  (generic — any agent)
 // ──────────────────────────────────────────────────────────────
 
 service AgentService {
@@ -167,6 +167,243 @@ service AgentService {
 
   // Subscribe to agent events (server-side stream)
   rpc Subscribe     (SubscribeRequest)   returns (stream AgentEvent);
+}
+
+// ──────────────────────────────────────────────────────────────
+// Central Agent Service
+// ──────────────────────────────────────────────────────────────
+
+service CentralAgentService {
+  // Process a user text/voice input and return a response
+  rpc ProcessInput      (UserInputRequest)      returns (AgentResponse);
+
+  // Streaming version: returns partial tokens as they are generated
+  rpc ProcessInputStream (UserInputRequest)     returns (stream AgentResponseChunk);
+
+  // Retrieve current system status (all sub-agents)
+  rpc GetSystemStatus   (SystemStatusRequest)   returns (SystemStatusResponse);
+
+  // Graceful shutdown sequence
+  rpc Shutdown          (ShutdownRequest)       returns (AckResponse);
+}
+
+message UserInputRequest {
+  string input_text   = 1;
+  string input_type   = 2;   // text | voice | event
+  string session_id   = 3;
+  string request_id   = 4;
+  EmotionState current_emotion = 5;
+}
+
+message AgentResponse {
+  string request_id   = 1;
+  string response_text = 2;
+  string intent        = 3;
+  EmotionState emotion = 4;
+  repeated string actions_taken = 5;
+  int32  latency_ms   = 6;
+}
+
+message AgentResponseChunk {
+  string request_id = 1;
+  string chunk      = 2;
+  bool   is_final   = 3;
+}
+
+message SystemStatusRequest {}
+
+message SystemStatusResponse {
+  repeated AgentStatusEntry agents = 1;
+  float   system_cpu_percent       = 2;
+  int64   system_memory_mb         = 3;
+}
+
+message AgentStatusEntry {
+  string agent_id    = 1;
+  string state       = 2;   // active | standby | hibernated | error
+  float  cpu_percent = 3;
+  int64  memory_mb   = 4;
+}
+
+message ShutdownRequest {
+  int32 grace_period_s = 1;
+}
+
+// ──────────────────────────────────────────────────────────────
+// Memory Manager Service
+// ──────────────────────────────────────────────────────────────
+
+service MemoryManagerService {
+  // Store a new memory entry
+  rpc Store         (StoreMemoryRequest)   returns (AckResponse);
+
+  // Retrieve memories by semantic similarity
+  rpc Retrieve      (RetrieveRequest)      returns (RetrieveResponse);
+
+  // Retrieve recent episodic memories
+  rpc GetRecent     (GetRecentRequest)     returns (GetRecentResponse);
+
+  // Trigger an explicit consolidation pass
+  rpc Consolidate   (ConsolidateRequest)   returns (AckResponse);
+
+  // Delete a specific memory
+  rpc Forget        (ForgetRequest)        returns (AckResponse);
+}
+
+message StoreMemoryRequest {
+  string content         = 1;
+  string memory_type     = 2;   // episodic | semantic | working
+  float  importance      = 3;   // 0.0–1.0
+  string session_id      = 4;
+  map<string, string> metadata = 5;
+}
+
+message RetrieveRequest {
+  string query      = 1;
+  int32  limit      = 2;
+  float  min_score  = 3;   // minimum similarity threshold
+  string memory_type = 4;  // episodic | semantic | all
+}
+
+message RetrieveResponse {
+  repeated MemoryEntry memories = 1;
+}
+
+message MemoryEntry {
+  string memory_id   = 1;
+  string content     = 2;
+  string memory_type = 3;
+  float  importance  = 4;
+  float  similarity  = 5;   // populated on retrieval
+  string created_at  = 6;
+  map<string, string> metadata = 7;
+}
+
+message GetRecentRequest {
+  int32  limit      = 1;
+  string session_id = 2;
+}
+
+message GetRecentResponse {
+  repeated MemoryEntry memories = 1;
+}
+
+message ConsolidateRequest {
+  bool force = 1;   // run even if not due
+}
+
+message ForgetRequest {
+  string memory_id = 1;
+}
+
+// ──────────────────────────────────────────────────────────────
+// Language Center Service
+// ──────────────────────────────────────────────────────────────
+
+service LanguageCenterService {
+  // Understand intent and entities from raw text
+  rpc Understand    (UnderstandRequest)    returns (UnderstandResponse);
+
+  // Generate a natural language response
+  rpc Generate      (GenerateRequest)      returns (GenerateResponse);
+
+  // Streaming generation
+  rpc GenerateStream (GenerateRequest)     returns (stream GenerateChunk);
+
+  // Classify sentiment of text
+  rpc Sentiment     (SentimentRequest)     returns (SentimentResponse);
+}
+
+message UnderstandRequest {
+  string text       = 1;
+  string session_id = 2;
+  map<string, string> context = 3;
+}
+
+message UnderstandResponse {
+  string intent              = 1;   // e.g. "query.weather", "task.create", "chitchat"
+  float  intent_confidence   = 2;
+  repeated Entity entities   = 3;
+  string sentiment           = 4;   // positive | neutral | negative
+  float  sentiment_score     = 5;
+}
+
+message Entity {
+  string type  = 1;   // e.g. "date", "person", "location", "task"
+  string value = 2;
+  float  confidence = 3;
+  int32  start = 4;
+  int32  end   = 5;
+}
+
+message GenerateRequest {
+  string prompt       = 1;
+  string intent       = 2;
+  EmotionState emotion = 3;
+  PersonalityVector personality = 4;
+  int32  max_tokens   = 5;
+  float  temperature  = 6;
+  repeated MemoryEntry context_memories = 7;
+}
+
+message GenerateResponse {
+  string text        = 1;
+  int32  tokens_used = 2;
+  int32  latency_ms  = 3;
+}
+
+message GenerateChunk {
+  string token    = 1;
+  bool   is_final = 2;
+}
+
+message SentimentRequest {
+  string text = 1;
+}
+
+message SentimentResponse {
+  string label = 1;   // positive | neutral | negative
+  float  score = 2;
+}
+
+// ──────────────────────────────────────────────────────────────
+// Emotion Regulator Service
+// ──────────────────────────────────────────────────────────────
+
+service EmotionRegulatorService {
+  // Get current emotional state
+  rpc GetState      (EmotionStateRequest)  returns (EmotionStateResponse);
+
+  // Update emotion based on an event (input, task result, etc.)
+  rpc UpdateEmotion (EmotionUpdateRequest) returns (EmotionStateResponse);
+
+  // Get current personality vector
+  rpc GetPersonality (PersonalityRequest)  returns (PersonalityResponse);
+
+  // Update personality (e.g. user preference change)
+  rpc SetPersonality (PersonalityVector)   returns (AckResponse);
+}
+
+message EmotionStateRequest {}
+
+message EmotionStateResponse {
+  EmotionState current    = 1;
+  EmotionState target     = 2;   // where we are transitioning to
+  float        transition_progress = 3;   // 0.0–1.0
+  string       updated_at = 4;
+}
+
+message EmotionUpdateRequest {
+  string event_type   = 1;   // user.positive_feedback | task.failed | user.greeting | etc.
+  float  intensity    = 2;   // 0.0–1.0 — how strongly this event should affect emotion
+  map<string, string> context = 3;
+}
+
+message PersonalityRequest {}
+
+message PersonalityResponse {
+  PersonalityVector personality = 1;
+  string            profile_name = 2;   // e.g. "default", "professional", "playful"
 }
 
 message AgentQueryRequest {

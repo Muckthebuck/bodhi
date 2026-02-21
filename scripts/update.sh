@@ -52,14 +52,38 @@ if echo "$CHANGED" | grep -q "monitoring/"; then
   docker compose up -d node-exporter prometheus grafana loki promtail
 fi
 
-# Restart application services (rolling, when they exist)
+# Restart application services (rolling, when they exist).
+# After each restart, wait for the container to become healthy
+# (or running if no healthcheck is defined) before moving on.
+_wait_for_service() {
+  local svc=$1 waited=0 limit=60
+  local cid
+  cid=$(docker compose ps -q "$svc" 2>/dev/null | head -1)
+  [ -z "$cid" ] && return 0
+  while [ "$waited" -lt "$limit" ]; do
+    local health state
+    health=$(docker inspect --format '{{.State.Health.Status}}' "$cid" 2>/dev/null)
+    state=$(docker inspect --format '{{.State.Status}}' "$cid" 2>/dev/null)
+    # No healthcheck defined — just check it's running
+    if [ -z "$health" ] && [ "$state" = "running" ]; then return 0; fi
+    # Has a healthcheck — wait for healthy
+    if [ "$health" = "healthy" ]; then return 0; fi
+    if [ "$health" = "unhealthy" ]; then
+      warn "${svc} became unhealthy after restart"
+      return 1
+    fi
+    sleep 3; waited=$((waited + 3))
+  done
+  warn "${svc} did not become healthy within ${limit}s — continuing"
+}
+
 for service in central-agent language-center memory-manager emotion-regulator \
                skill-executor tool-coordinator visual-agent auditory-agent \
                voice-synthesizer motor-controller api-gateway; do
   if docker compose ps --services | grep -q "^${service}$"; then
     echo "  Restarting ${service}..."
     docker compose up -d --no-deps "$service"
-    sleep 3
+    _wait_for_service "$service"
   fi
 done
 

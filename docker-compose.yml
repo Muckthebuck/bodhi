@@ -146,6 +146,13 @@ services:
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/rootfs'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    healthcheck:
+      # busybox wget (-O /dev/null, not --spider which is GNU-only)
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9100/metrics || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - bodhi-network
     logging: *default-logging
@@ -179,12 +186,8 @@ services:
     restart: unless-stopped
     environment:
       REDIS_ADDR: "redis://redis:6379"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:9121/metrics || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    # No healthcheck: image is distroless (no sh, wget, or curl).
+    # Prometheus scrape health is verified via smoke tests.
     depends_on:
       redis:
         condition: service_healthy

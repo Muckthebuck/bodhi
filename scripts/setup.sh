@@ -122,7 +122,7 @@ while true; do
   $_all && break
   if [ "$_WAIT" -ge 120 ]; then
     echo ""
-    error "Timed out waiting for databases to become healthy"
+    err "Timed out waiting for databases to become healthy"
     docker compose ps
     exit 1
   fi

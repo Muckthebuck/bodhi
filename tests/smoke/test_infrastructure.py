@@ -68,12 +68,14 @@ class TestAllServicesHealthy:
 
     @pytest.mark.parametrize("service", INFRA_SERVICES)
     def test_service_is_healthy(self, service):
-        r = _run(["docker", "compose", "ps", "--format", "json", service])
         import json
-        for line in r.stdout.splitlines():
-            if not line.strip():
-                continue
-            data = json.loads(line)
+        r = _run(["docker", "compose", "ps", "--format", "json", service])
+        assert r.returncode == 0, f"docker compose ps failed for {service}:\n{r.stderr}"
+
+        rows = [json.loads(line) for line in r.stdout.splitlines() if line.strip()]
+        assert rows, f"No container data returned for service '{service}' — is it running?"
+
+        for data in rows:
             health = data.get("Health", "")
             state = data.get("State", "")
             assert state == "running", f"{service} is not running (state={state})"

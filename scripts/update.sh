@@ -51,7 +51,7 @@ fi
 # Restart monitoring only if config changed
 if echo "$CHANGED" | grep -q "monitoring/"; then
   warn "Monitoring config changed — restarting stack"
-  docker compose up -d node-exporter prometheus grafana loki promtail
+  docker compose up -d node-exporter postgres-exporter redis-exporter prometheus grafana loki promtail
 fi
 
 # Restart application services (rolling, when they exist).

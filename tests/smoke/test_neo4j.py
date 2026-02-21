@@ -53,11 +53,24 @@ class TestNeo4j:
         """Inserting two Skills with the same skill_id must raise a constraint error."""
         from neo4j.exceptions import ClientError
         with neo4j_driver.session() as s:
-            s.run("CREATE (:Skill {skill_id: '__smoke_dup_test__', name: 'a'})")
+            # Explicit tx1: create the first node and commit
+            tx1 = s.begin_transaction()
             try:
-                s.run("CREATE (:Skill {skill_id: '__smoke_dup_test__', name: 'b'})")
+                tx1.run("CREATE (:Skill {skill_id: '__smoke_dup_test__', name: 'a'})")
+                tx1.commit()
+            except Exception:
+                tx1.rollback()
+                raise
+
+            # Explicit tx2: attempt duplicate — must be rejected
+            tx2 = s.begin_transaction()
+            try:
+                tx2.run("CREATE (:Skill {skill_id: '__smoke_dup_test__', name: 'b'})")
+                tx2.commit()
                 assert False, "Expected uniqueness constraint violation"
             except ClientError as e:
+                tx2.rollback()
                 assert "ConstraintValidationFailed" in str(e) or "already exists" in str(e).lower()
             finally:
-                s.run("MATCH (s:Skill {skill_id: '__smoke_dup_test__'}) DELETE s")
+                # Cleanup regardless of what happened above
+                s.run("MATCH (sk:Skill {skill_id: '__smoke_dup_test__'}) DELETE sk")

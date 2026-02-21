@@ -6,9 +6,15 @@ service:
   max_request_size_mb: 32
 
 # Collection defaults
+# on_disk: false keeps vectors in RAM for fastest access.
+# Capacity estimate (384-dim float32 embeddings):
+#   ~1.5 KB per vector → ~512 MB limit supports ~340 K vectors.
+# For larger deployments (>300 K memories) set on_disk: true to
+# spill vectors to the mounted storage volume with minimal
+# latency impact on modern NVMe/SSD storage.
 collection:
   vectors:
-    on_disk: false
+    on_disk: false   # set to true when approaching 300 K vectors
   optimizers:
     default_segment_number: 2
   replication_factor: 1

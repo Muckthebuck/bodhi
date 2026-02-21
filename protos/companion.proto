@@ -1,0 +1,245 @@
+syntax = "proto3";
+
+package bodhi;
+
+option go_package = "github.com/Muckthebuck/bodhi/gen/go/bodhi";
+option java_package = "com.bodhi.proto";
+
+// ============================================================
+// Bodhi — gRPC Service Definitions
+// ============================================================
+// Two surfaces:
+//   1. ClientService  — host ↔ client device (screen, audio, character)
+//   2. AgentService   — internal agent ↔ agent communication
+// ============================================================
+
+
+// ──────────────────────────────────────────────────────────────
+// Client ↔ Host Service
+// ──────────────────────────────────────────────────────────────
+
+service ClientService {
+  // Capture and analyse client screen (on-demand only)
+  rpc CaptureScreen     (ScreenCaptureRequest)     returns (ScreenCaptureResponse);
+
+  // Send voice transcript from client STT to host
+  rpc SendVoiceInput    (VoiceInputRequest)         returns (AckResponse);
+
+  // Host → client: play synthesised audio + lip-sync
+  rpc PlayAudio         (AudioPlaybackRequest)      returns (AckResponse);
+
+  // Host → client: control on-screen character
+  rpc ControlCharacter  (CharacterControlRequest)   returns (AckResponse);
+
+  // Bidirectional event stream for real-time updates
+  rpc StreamEvents      (stream ClientEvent)        returns (stream HostEvent);
+}
+
+// ── Screen Capture ────────────────────────────────────────────
+
+message ScreenCaptureRequest {
+  // full_screen | active_window | region | smart_areas
+  string mode  = 1;
+  // Optional user query for context-aware capture
+  string query = 2;
+}
+
+message ScreenCaptureResponse {
+  string     timestamp   = 1;
+  AppContext  app        = 2;
+  string     activity   = 3;   // e.g. "coding", "browsing", "writing"
+  string     scene_type = 4;   // e.g. "ide", "browser", "terminal"
+  TextContent text      = 5;
+  repeated DetectedObject objects = 6;
+  ScreenInsights insights = 7;
+  PrivacyReport privacy  = 8;
+}
+
+message AppContext {
+  string app_name     = 1;
+  string window_title = 2;
+  int32  process_id   = 3;
+}
+
+message TextContent {
+  repeated TextBlock blocks    = 1;
+  string             full_text = 2;
+}
+
+message TextBlock {
+  string      text       = 1;
+  BoundingBox bbox       = 2;
+  float       confidence = 3;
+}
+
+message BoundingBox {
+  int32 x      = 1;
+  int32 y      = 2;
+  int32 width  = 3;
+  int32 height = 4;
+}
+
+message DetectedObject {
+  string      label      = 1;
+  float       confidence = 2;
+  BoundingBox bbox       = 3;
+}
+
+message ScreenInsights {
+  int32            unread_count  = 1;
+  string           primary_action = 2;
+  repeated string  notable_items  = 3;
+}
+
+message PrivacyReport {
+  int32           redactions_applied = 1;
+  repeated string sensitive_types    = 2;   // "password", "credit_card", etc.
+}
+
+// ── Voice ─────────────────────────────────────────────────────
+
+message VoiceInputRequest {
+  string transcript  = 1;
+  float  confidence  = 2;
+  string timestamp   = 3;
+  // whisper | azure | google
+  string stt_backend = 4;
+}
+
+message AudioPlaybackRequest {
+  bytes          audio_data  = 1;   // PCM or MP3
+  int32          sample_rate = 2;
+  repeated Phoneme phonemes  = 3;   // for lip-sync
+  float          duration_s  = 4;
+  string         emotion     = 5;   // e.g. "happy", "calm"
+}
+
+message Phoneme {
+  string sound       = 1;
+  float  start_time  = 2;
+  float  duration    = 3;
+  string mouth_shape = 4;   // viseme id
+}
+
+// ── Character Control ─────────────────────────────────────────
+
+message CharacterControlRequest {
+  // play_animation | set_position | set_expression | speak | dock
+  string              command    = 1;
+  map<string, string> parameters = 2;
+}
+
+// ── Generic Ack ───────────────────────────────────────────────
+
+message AckResponse {
+  bool   success = 1;
+  string message = 2;
+}
+
+// ── Event Streaming ───────────────────────────────────────────
+
+message ClientEvent {
+  string              event_type = 1;   // user.click | user.typing | screen.changed
+  string              timestamp  = 2;
+  map<string, string> data       = 3;
+}
+
+message HostEvent {
+  string              event_type = 1;   // bodhi.speaking | bodhi.thinking | task.complete
+  string              timestamp  = 2;
+  map<string, string> data       = 3;
+}
+
+
+// ──────────────────────────────────────────────────────────────
+// Internal Agent Service
+// ──────────────────────────────────────────────────────────────
+
+service AgentService {
+  // Query an agent for information
+  rpc Query         (AgentQueryRequest)  returns (AgentQueryResponse);
+
+  // Tell an agent to execute an action
+  rpc Execute       (ActionRequest)      returns (ActionResponse);
+
+  // Get current agent state and resource usage
+  rpc GetStatus     (StatusRequest)      returns (StatusResponse);
+
+  // Subscribe to agent events (server-side stream)
+  rpc Subscribe     (SubscribeRequest)   returns (stream AgentEvent);
+}
+
+message AgentQueryRequest {
+  string              agent_id    = 1;
+  string              query_type  = 2;
+  map<string, string> parameters  = 3;
+  string              request_id  = 4;
+}
+
+message AgentQueryResponse {
+  string              request_id = 1;
+  bool                success    = 2;
+  map<string, string> result     = 3;
+  string              error      = 4;
+  int32               latency_ms = 5;
+}
+
+message ActionRequest {
+  string              agent_id    = 1;
+  string              action_type = 2;
+  map<string, string> parameters  = 3;
+  string              request_id  = 4;
+}
+
+message ActionResponse {
+  string request_id = 1;
+  bool   success    = 2;
+  string result     = 3;
+  string error      = 4;
+}
+
+message StatusRequest {
+  string agent_id = 1;
+}
+
+message StatusResponse {
+  string agent_id      = 1;
+  // unloaded | hibernated | standby | active | error
+  string state         = 2;
+  float  cpu_percent   = 3;
+  int64  memory_mb     = 4;
+  string last_activity = 5;
+  int32  queue_depth   = 6;
+}
+
+message SubscribeRequest {
+  string agent_id         = 1;
+  repeated string topics  = 2;   // e.g. ["emotion.*", "task.complete"]
+}
+
+message AgentEvent {
+  string              agent_id   = 1;
+  string              event_type = 2;
+  string              timestamp  = 3;
+  map<string, string> data       = 4;
+}
+
+
+// ──────────────────────────────────────────────────────────────
+// Shared / Common Types
+// ──────────────────────────────────────────────────────────────
+
+message EmotionState {
+  float valence   = 1;   // -1.0 (negative) to +1.0 (positive)
+  float arousal   = 2;   //  0.0 (calm)     to +1.0 (excited)
+  float dominance = 3;   //  0.0 (submissive) to +1.0 (dominant)
+  string label    = 4;   // e.g. "happy", "curious", "calm"
+}
+
+message PersonalityVector {
+  float openness          = 1;
+  float conscientiousness = 2;
+  float extraversion      = 3;
+  float agreeableness     = 4;
+  float neuroticism       = 5;
+}

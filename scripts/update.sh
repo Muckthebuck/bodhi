@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # Bodhi — Update Script
-# Pulls latest code and restarts services with zero downtime.
+# Pulls latest code and restarts services with minimal downtime where possible.
 # ============================================================
 set -euo pipefail
 

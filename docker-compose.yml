@@ -200,7 +200,9 @@ services:
       - loki-data:/loki
     command: -config.file=/etc/loki/config.yml
     healthcheck:
-      test: ["CMD-SHELL", "[ -f /tmp/loki-started ] || (loki --version > /dev/null 2>&1 && touch /tmp/loki-started)"]
+      # Loki's image has no wget/curl; use bash TCP to verify :3100 is accepting
+      # connections — a genuine readiness signal vs. just checking a flag file.
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/3100' 2>/dev/null || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 10

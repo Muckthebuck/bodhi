@@ -76,8 +76,7 @@ if [ ! -f .env ]; then
   sed -i "s/^GRAFANA_PASSWORD=.*/GRAFANA_PASSWORD=${GF_PASS}/" .env
   sed -i "s/^ARCH=.*/ARCH=${ARCH}/" .env
 
-  ok ".env created with generated secrets"
-  info "Grafana password: ${GF_PASS}  (also stored in .env)"
+  ok ".env created with generated secrets — retrieve credentials from .env"
 else
   ok ".env already exists — skipping"
 fi

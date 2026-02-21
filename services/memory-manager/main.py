@@ -133,7 +133,7 @@ async def _run_consolidation() -> None:
                         if cursor == 0 or iteration >= max_iterations:
                             break
                     if iteration >= max_iterations:
-                        log.warning("consolidation_scan_truncated", keys_found=len(keys))
+                        log.error("consolidation_scan_truncated_data_loss_possible", keys_found=len(keys))
             except asyncio.TimeoutError:
                 log.warning("consolidation_scan_timeout", keys_found=len(keys))
 
@@ -317,7 +317,7 @@ class StoreRequest(BaseModel):
     content: str = Field(min_length=1, max_length=10_000)
     memory_type: str = Field(pattern="^(episodic|semantic|working)$")
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
-    session_id: str = ""
+    session_id: str = Field(default="", pattern=r"^[a-zA-Z0-9_-]*$")
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -331,7 +331,7 @@ class RetrieveRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=100)
     min_score: float = Field(default=0.0, ge=0.0, le=1.0)
     memory_type: str | None = None
-    session_id: str = ""
+    session_id: str = Field(default="", pattern=r"^[a-zA-Z0-9_-]*$")
 
 
 class MemoryResult(BaseModel):

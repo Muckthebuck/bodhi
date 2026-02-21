@@ -95,9 +95,12 @@ services:
     image: neo4j:5-community
     container_name: bodhi-neo4j-init
     restart: "no"
+    environment:
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
     volumes:
       - ./infra/init-db/neo4j.cypher:/init.cypher:ro
-    command: ["cypher-shell", "-u", "neo4j", "-p", "${NEO4J_PASSWORD}", "-a", "bolt://neo4j:7687", "--file", "/init.cypher"]
+    command: ["cypher-shell", "-a", "bolt://neo4j:7687", "--file", "/init.cypher"]
     depends_on:
       neo4j:
         condition: service_healthy

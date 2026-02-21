@@ -263,6 +263,12 @@ async def _redis_subscriber() -> None:
 async def lifespan(app: FastAPI):
     global _redis_client, _db_pool
 
+    # Fail fast if EVENT_EFFECTS has any typo'd dimension keys
+    _valid_vad = {"valence", "arousal", "dominance"}
+    for _event, _effects in EVENT_EFFECTS.items():
+        if set(_effects.keys()) != _valid_vad:
+            raise ValueError(f"EVENT_EFFECTS[{_event!r}] has invalid keys: {set(_effects.keys())}")
+
     _redis_client = aioredis.from_url(REDIS_URL, decode_responses=True)
     log.info("redis_connected", url=REDIS_URL)
 
@@ -386,7 +392,8 @@ async def put_personality(body: PersonalityUpdate) -> dict[str, Any]:
         log.error("personality_save_failed", error=str(exc))
         raise HTTPException(status_code=503, detail="Failed to persist personality") from exc
 
-    personality.update(updates)
+    async with _state_lock:
+        personality.update(updates)
     log.info("personality_updated", fields=list(updates.keys()))
     return {"status": "ok", "personality": dict(personality)}
 

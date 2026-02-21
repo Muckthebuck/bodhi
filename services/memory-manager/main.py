@@ -38,13 +38,14 @@ EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 VECTOR_DIM = 384
 WORKING_MEMORY_TTL = 3600
 CONSOLIDATION_INTERVAL = 1800
+_CONSOLIDATION_LOCK_KEY = "lock:consolidation"
+_CONSOLIDATION_LOCK_TTL = CONSOLIDATION_INTERVAL + 300  # expire if service dies mid-run
 
 _redis: aioredis.Redis | None = None
 _pg_pool: asyncpg.Pool | None = None
 _qdrant: AsyncQdrantClient | None = None
 _embedder = None
 _embedder_lock = asyncio.Lock()
-_consolidation_lock = asyncio.Lock()  # prevents concurrent consolidation runs
 
 
 def _get_embedder():
@@ -108,21 +109,28 @@ async def _consolidation_loop() -> None:
 
 
 async def _run_consolidation() -> None:
-    if _consolidation_lock.locked():
+    # Redis distributed lock — safe across service restarts (asyncio.Lock is not)
+    acquired = await _redis.set(_CONSOLIDATION_LOCK_KEY, "1", nx=True, ex=_CONSOLIDATION_LOCK_TTL)
+    if not acquired:
         log.info("consolidation_already_running_skipped")
         return
-    async with _consolidation_lock:
+    try:
         t0 = time.perf_counter()
         consolidated = 0
         try:
             # SCAN is non-blocking; KEYS would freeze Redis for all services
             keys: list[str] = []
             cursor = 0
+            max_iterations = 500
+            iteration = 0
             while True:
-                cursor, partial = await _redis.scan(cursor, match="working_memory:*", count=100)
+                cursor, partial = await _redis.scan(cursor, match="working_memory:*", count=1000)
                 keys.extend(partial)
-                if cursor == 0:
+                iteration += 1
+                if cursor == 0 or iteration >= max_iterations:
                     break
+            if iteration >= max_iterations:
+                log.warning("consolidation_scan_truncated", keys_found=len(keys))
 
             for key in keys:
                 raw = await _redis.get(key)
@@ -134,6 +142,7 @@ async def _run_consolidation() -> None:
                     continue
                 if entry.get("importance", 0) <= 0.7:
                     continue
+
                 try:
                     await _store_episodic(
                         content=entry["content"],
@@ -147,10 +156,22 @@ async def _run_consolidation() -> None:
                         importance=entry.get("importance", 0.5),
                         metadata=entry.get("metadata", {}),
                     )
-                    await _redis.delete(key)
-                    consolidated += 1
                 except Exception as exc:
-                    log.warning("consolidation_entry_failed", key=key, error=str(exc))
+                    log.warning("consolidation_store_failed", key=key, error=str(exc))
+                    continue  # keep working memory; retry on next consolidation run
+
+                # Both stores succeeded — remove from working set.
+                # On delete failure, set a short TTL (<< CONSOLIDATION_INTERVAL) so the
+                # key expires before next run, preventing duplicate storage.
+                try:
+                    await _redis.delete(key)
+                except Exception as del_exc:
+                    log.warning("consolidation_delete_failed_setting_expiry", key=key, error=str(del_exc))
+                    try:
+                        await _redis.expire(key, 300)  # 5 min << 30 min interval
+                    except Exception:
+                        pass
+                consolidated += 1
             metrics.consolidation_runs_total.inc()
             metrics.memory_latency_seconds.labels(operation="consolidation").observe(
                 time.perf_counter() - t0
@@ -158,6 +179,8 @@ async def _run_consolidation() -> None:
             log.info("consolidation_complete", consolidated=consolidated)
         except Exception as exc:
             log.error("consolidation_failed", error=str(exc))
+    finally:
+        await _redis.delete(_CONSOLIDATION_LOCK_KEY)
 
 
 async def _store_episodic(
@@ -166,8 +189,9 @@ async def _store_episodic(
     importance: float,
     metadata: dict,
 ) -> str:
-    async with _pg_pool.acquire() as conn:
-        row = await conn.fetchrow(
+    async with asyncio.timeout(5.0):
+        async with _pg_pool.acquire() as conn:
+            row = await conn.fetchrow(
             """
             INSERT INTO memories (session_id, content, memory_type, importance, metadata)
             VALUES ($1, $2, 'episodic', $3, $4)
@@ -253,7 +277,7 @@ app = FastAPI(title="memory-manager", version="0.1.0", lifespan=lifespan)
 
 
 class StoreRequest(BaseModel):
-    content: str
+    content: str = Field(min_length=1, max_length=10_000)
     memory_type: str = Field(pattern="^(episodic|semantic|working)$")
     importance: float = Field(default=0.5, ge=0.0, le=1.0)
     session_id: str = ""
@@ -376,31 +400,32 @@ async def retrieve_memories(req: RetrieveRequest) -> list[MemoryResult]:
 @app.get("/recent", response_model=list[dict])
 async def recent_memories(limit: int = 10, session_id: str | None = None) -> list[dict]:
     try:
-        async with _pg_pool.acquire() as conn:
-            if session_id:
-                rows = await conn.fetch(
-                    """
-                    SELECT memory_id, session_id, content, memory_type, importance,
-                           access_count, last_accessed, created_at, metadata
-                    FROM memories
-                    WHERE session_id = $1
-                    ORDER BY created_at DESC
-                    LIMIT $2
-                    """,
-                    session_id,
-                    limit,
-                )
-            else:
-                rows = await conn.fetch(
-                    """
-                    SELECT memory_id, session_id, content, memory_type, importance,
-                           access_count, last_accessed, created_at, metadata
-                    FROM memories
-                    ORDER BY created_at DESC
-                    LIMIT $1
-                    """,
-                    limit,
-                )
+        async with asyncio.timeout(5.0):
+            async with _pg_pool.acquire() as conn:
+                if session_id:
+                    rows = await conn.fetch(
+                        """
+                        SELECT memory_id, session_id, content, memory_type, importance,
+                               access_count, last_accessed, created_at, metadata
+                        FROM memories
+                        WHERE session_id = $1
+                        ORDER BY created_at DESC
+                        LIMIT $2
+                        """,
+                        session_id,
+                        limit,
+                    )
+                else:
+                    rows = await conn.fetch(
+                        """
+                        SELECT memory_id, session_id, content, memory_type, importance,
+                               access_count, last_accessed, created_at, metadata
+                        FROM memories
+                        ORDER BY created_at DESC
+                        LIMIT $1
+                        """,
+                        limit,
+                    )
         return [dict(row) for row in rows]
     except Exception as exc:
         log.error("recent_failed", error=str(exc))

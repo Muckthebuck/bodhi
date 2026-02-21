@@ -44,8 +44,8 @@ _state: dict[str, Any] = {
 
 
 class InputRequest(BaseModel):
-    text: str = Field(min_length=1)
-    session_id: str
+    text: str = Field(min_length=1, max_length=2_000)
+    session_id: str = Field(min_length=1, max_length=100, pattern=r"^[a-zA-Z0-9_-]+$")
 
 
 class InputResponse(BaseModel):
@@ -66,26 +66,30 @@ async def _redis_subscriber() -> None:
         msg_type: str = message["type"]
         if msg_type not in ("message", "pmessage"):
             continue
-        channel: str = message["channel"]
-        data: str = message["data"]
+        try:
+            channel: str = message["channel"]
+            data: str = message["data"]
 
-        if channel.startswith("language.response."):
-            # channel = language.response.<request_id>
-            request_id = channel[len("language.response."):]
-            try:
-                payload = json.loads(data)
-                response_text = payload.get("response", json.dumps(payload))
-            except Exception:
-                response_text = data
-            future: asyncio.Future | None = _state["pending_responses"].get(request_id)
-            if future and not future.done():
-                future.set_result(response_text)
+            if channel.startswith("language.response."):
+                # channel = language.response.<request_id>
+                request_id = channel[len("language.response."):]
+                try:
+                    payload = json.loads(data)
+                    response_text = payload.get("response", json.dumps(payload))
+                except Exception:
+                    response_text = data
+                future: asyncio.Future | None = _state["pending_responses"].get(request_id)
+                if future and not future.done():
+                    future.set_result(response_text)
 
-        elif channel == "emotion.state_changed":
-            log.info("emotion_state_changed", data=data)
+            elif channel == "emotion.state_changed":
+                log.info("emotion_state_changed", data=data)
 
-        elif channel == "memory.stored":
-            log.info("memory_stored", data=data)
+            elif channel == "memory.stored":
+                log.info("memory_stored", data=data)
+
+        except Exception as exc:
+            log.error("redis_subscriber_message_error", error=str(exc))
 
 
 async def _heartbeat_watcher() -> None:
@@ -96,10 +100,13 @@ async def _heartbeat_watcher() -> None:
     async for message in pubsub.listen():
         if message["type"] != "pmessage":
             continue
-        channel: str = message["channel"]
-        agent_name = channel.split(".")[-1]
-        _state["active_agents"].add(agent_name)
-        metrics.active_agents.set(len(_state["active_agents"]))
+        try:
+            channel: str = message["channel"]
+            agent_name = channel.split(".")[-1]
+            _state["active_agents"].add(agent_name)
+            metrics.active_agents.set(len(_state["active_agents"]))
+        except Exception as exc:
+            log.error("heartbeat_watcher_message_error", error=str(exc))
 
 
 @asynccontextmanager
@@ -123,7 +130,10 @@ async def lifespan(app: FastAPI):
         _state["neo4j_driver"] = AsyncGraphDatabase.driver(
             NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD)
         )
-        await _state["neo4j_driver"].verify_connectivity()
+        await asyncio.wait_for(
+            _state["neo4j_driver"].verify_connectivity(),
+            timeout=5.0,
+        )
         log.info("neo4j_connected", uri=NEO4J_URI)
     except Exception as exc:
         log.error("neo4j_connect_failed", error=str(exc))
@@ -199,7 +209,10 @@ async def handle_input(body: InputRequest, request: Request) -> InputResponse:
 
     payload = json.dumps({"request_id": request_id, "session_id": body.session_id, "text": body.text})
     try:
-        await _state["redis"].publish("user.input", payload)
+        await asyncio.wait_for(
+            _state["redis"].publish("user.input", payload),
+            timeout=2.0,
+        )
         log.info("input_published", request_id=request_id, session_id=body.session_id)
 
         response_text = await asyncio.wait_for(future, timeout=RESPONSE_TIMEOUT)

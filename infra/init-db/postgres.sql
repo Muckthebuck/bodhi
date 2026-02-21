@@ -31,6 +31,7 @@ CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(memory_type);
 CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id);
 CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memories_session_time ON memories(session_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_tags ON memories USING GIN(tags);
 
 -- ── Skill System ─────────────────────────────────────────────

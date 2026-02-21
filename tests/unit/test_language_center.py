@@ -1,5 +1,7 @@
 """Unit tests — language-center pure logic (no I/O)"""
+
 import sys
+
 import pytest
 
 _main = sys.modules["lc_main"]
@@ -220,22 +222,31 @@ class TestValenceToAdjective:
 
 class TestGenerateResponse:
     _personality = {
-        "openness": 0.8, "conscientiousness": 0.7,
-        "extraversion": 0.5, "agreeableness": 0.8, "neuroticism": 0.2,
+        "openness": 0.8,
+        "conscientiousness": 0.7,
+        "extraversion": 0.5,
+        "agreeableness": 0.8,
+        "neuroticism": 0.2,
     }
 
     def test_returns_non_empty_string(self):
-        text = _generate_response("hello", "chitchat", {"valence": 0.5, "arousal": 0.3}, self._personality)
+        text = _generate_response(
+            "hello", "chitchat", {"valence": 0.5, "arousal": 0.3}, self._personality
+        )
         assert isinstance(text, str)
         assert len(text) > 0
 
     def test_high_neuroticism_adds_caveat(self):
         cautious_personality = {**self._personality, "neuroticism": 0.8}
-        text = _generate_response("hello", "chitchat", {"valence": 0.5, "arousal": 0.3}, cautious_personality)
+        text = _generate_response(
+            "hello", "chitchat", {"valence": 0.5, "arousal": 0.3}, cautious_personality
+        )
         assert "wrong" in text.lower() or "let me know" in text.lower()
 
     def test_low_neuroticism_no_caveat(self):
-        text = _generate_response("hello", "chitchat", {"valence": 0.5, "arousal": 0.3}, self._personality)
+        text = _generate_response(
+            "hello", "chitchat", {"valence": 0.5, "arousal": 0.3}, self._personality
+        )
         assert "wrong" not in text.lower()
 
     def test_different_intents_differ(self):

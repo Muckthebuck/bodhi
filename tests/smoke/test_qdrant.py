@@ -1,5 +1,7 @@
 """Smoke tests — Qdrant vector store"""
+
 import os
+
 import pytest
 
 

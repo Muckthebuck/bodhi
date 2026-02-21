@@ -6,7 +6,9 @@ and NLU consistency. These also document known limitations of the Phase 2
 keyword/pattern-based classifier (marked with xfail where the pattern matcher
 is expected to fall short — Phase 4 replaces this with a fine-tuned model).
 """
+
 import sys
+
 import pytest
 
 _main = sys.modules["lc_main"]
@@ -21,97 +23,125 @@ _generate_response = _main._generate_response
 # Different surface forms of the same intent should yield the same classification
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestIntentParaphraseRobustness:
     """Same intent, varied phrasing — the classifier should be consistent."""
 
-    @pytest.mark.parametrize("text", [
-        "hello",
-        "hey there",
-        "hi!",
-        "what's up?",
-        "howdy",
-        "hola",
-        "greetings",
-        "hey, how's it going?",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "hello",
+            "hey there",
+            "hi!",
+            "what's up?",
+            "howdy",
+            "hola",
+            "greetings",
+            "hey, how's it going?",
+        ],
+    )
     def test_greeting_paraphrases(self, text):
         intent, _ = _classify_intent(text)
         assert intent == "chitchat", f"'{text}' → expected chitchat, got {intent}"
 
-    @pytest.mark.parametrize("text", [
-        "remind me to call Alice tomorrow",
-        "set a reminder for 3pm",
-        "create a task: buy groceries",
-        "add a reminder to water the plants",
-        "remember to send the report",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "remind me to call Alice tomorrow",
+            "set a reminder for 3pm",
+            "create a task: buy groceries",
+            "add a reminder to water the plants",
+            "remember to send the report",
+        ],
+    )
     def test_task_create_paraphrases(self, text):
         intent, _ = _classify_intent(text)
         assert intent == "task.create", f"'{text}' → expected task.create, got {intent}"
 
-    @pytest.mark.parametrize("text", [
-        "show me my tasks",
-        "list my reminders",
-        "what's on my list?",
-        "what's on my agenda?",
-        "show my reminders",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "show me my tasks",
+            "list my reminders",
+            "what's on my list?",
+            "what's on my agenda?",
+            "show my reminders",
+        ],
+    )
     def test_task_list_paraphrases(self, text):
         intent, _ = _classify_intent(text)
         assert intent == "task.list", f"'{text}' → expected task.list, got {intent}"
 
-    @pytest.mark.parametrize("text", [
-        "what is photosynthesis?",
-        "who is Ada Lovelace?",
-        "explain how gravity works",
-        "tell me about the French Revolution",
-        "define recursion",
-        "what are black holes?",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "what is photosynthesis?",
+            "who is Ada Lovelace?",
+            "explain how gravity works",
+            "tell me about the French Revolution",
+            "define recursion",
+            "what are black holes?",
+        ],
+    )
     def test_factual_query_paraphrases(self, text):
         intent, _ = _classify_intent(text)
         assert intent == "query.factual", f"'{text}' → expected query.factual, got {intent}"
 
-    @pytest.mark.parametrize("text", [
-        "goodnight",
-        "good night",
-        "bye",
-        "goodbye",
-        "see you later",
-        pytest.param("shutting down", marks=pytest.mark.xfail(
-            reason="'shutting down' uses gerund form; Phase 2 regex only matches 'shutdown'/'shut down'"
-        )),
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "goodnight",
+            "good night",
+            "bye",
+            "goodbye",
+            "see you later",
+            pytest.param(
+                "shutting down",
+                marks=pytest.mark.xfail(
+                    reason="'shutting down' uses gerund form; Phase 2 regex only matches 'shutdown'/'shut down'"
+                ),
+            ),
+        ],
+    )
     def test_shutdown_paraphrases(self, text):
         intent, _ = _classify_intent(text)
         assert intent == "system.shutdown", f"'{text}' → expected system.shutdown, got {intent}"
 
-    @pytest.mark.parametrize("text", [
-        "are you ok?",
-        "what's your status?",
-        "system status",
-        "what is your status?",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "are you ok?",
+            "what's your status?",
+            "system status",
+            "what is your status?",
+        ],
+    )
     def test_status_paraphrases(self, text):
         intent, _ = _classify_intent(text)
         assert intent == "system.status", f"'{text}' → expected system.status, got {intent}"
 
-    @pytest.mark.parametrize("text", [
-        "how are you?",
-        "how are you doing?",
-        "how are you feeling?",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "how are you?",
+            "how are you doing?",
+            "how are you feeling?",
+        ],
+    )
     def test_greeting_how_are_you_maps_to_chitchat(self, text):
         """'how are you' phrases are chitchat, not system.status (intentional behavior)."""
         intent, _ = _classify_intent(text)
         assert intent == "chitchat", f"'{text}' → expected chitchat, got {intent}"
 
-    @pytest.mark.parametrize("text", [
-        "do you remember when we talked?",
-        "remember when I told you about Paris?",
-        "don't you remember my birthday?",
-        "recall our last conversation",
-    ])
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "do you remember when we talked?",
+            "remember when I told you about Paris?",
+            "don't you remember my birthday?",
+            "recall our last conversation",
+        ],
+    )
     def test_memory_query_paraphrases(self, text):
         intent, _ = _classify_intent(text)
         assert intent == "query.memory", f"'{text}' → expected query.memory, got {intent}"
@@ -121,6 +151,7 @@ class TestIntentParaphraseRobustness:
 # Intent boundary disambiguation
 # Similar-looking inputs that should map to DIFFERENT intents
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestIntentBoundaryDisambiguation:
     """Inputs near decision boundaries should land on the correct side."""
@@ -163,6 +194,7 @@ class TestIntentBoundaryDisambiguation:
 # Negation and edge cases
 # Documents known Phase 2 limitations (xfail) and things that must work
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestNegationAndEdgeCases:
     def test_empty_string_returns_unknown(self):
@@ -212,15 +244,19 @@ class TestNegationAndEdgeCases:
 # Sentiment reasoning
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestSentimentReasoning:
-    @pytest.mark.parametrize("text,expected", [
-        ("I love this, it's wonderful!", "positive"),
-        ("this is great and amazing", "positive"),
-        ("I hate this, it's terrible", "negative"),
-        ("awful and horrible experience", "negative"),
-        ("the file was saved", "neutral"),
-        ("ok", "neutral"),
-    ])
+    @pytest.mark.parametrize(
+        "text,expected",
+        [
+            ("I love this, it's wonderful!", "positive"),
+            ("this is great and amazing", "positive"),
+            ("I hate this, it's terrible", "negative"),
+            ("awful and horrible experience", "negative"),
+            ("the file was saved", "neutral"),
+            ("ok", "neutral"),
+        ],
+    )
     def test_sentiment_classification(self, text, expected):
         label, _ = _analyse_sentiment(text)
         assert label == expected, f"'{text}' → expected {expected}, got {label}"
@@ -250,10 +286,14 @@ class TestSentimentReasoning:
 # Generated responses should reflect emotion and personality correctly
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestGenerationReasoning:
     _base_personality = {
-        "openness": 0.8, "conscientiousness": 0.7,
-        "extraversion": 0.5, "agreeableness": 0.8, "neuroticism": 0.2,
+        "openness": 0.8,
+        "conscientiousness": 0.7,
+        "extraversion": 0.5,
+        "agreeableness": 0.8,
+        "neuroticism": 0.2,
     }
 
     def test_shutdown_response_contains_farewell_tone(self):
@@ -264,8 +304,9 @@ class TestGenerationReasoning:
             self._base_personality,
         )
         farewell_words = {"night", "sleep", "rest", "tomorrow", "dream", "shutdown", "bye"}
-        assert any(w in text.lower() for w in farewell_words), \
+        assert any(w in text.lower() for w in farewell_words), (
             f"Shutdown response missing farewell tone: '{text}'"
+        )
 
     def test_status_response_mentions_feeling(self):
         text = _generate_response(
@@ -275,8 +316,9 @@ class TestGenerationReasoning:
             self._base_personality,
         )
         feeling_words = {"feeling", "doing", "great", "good", "operational", "ready", "running"}
-        assert any(w in text.lower() for w in feeling_words), \
+        assert any(w in text.lower() for w in feeling_words), (
             f"Status response missing feeling word: '{text}'"
+        )
 
     def test_high_neuroticism_adds_caveat_suffix(self):
         cautious = {**self._base_personality, "neuroticism": 0.9}
@@ -289,8 +331,15 @@ class TestGenerationReasoning:
 
     def test_all_intents_produce_non_empty_response(self):
         intents = [
-            "chitchat", "query.factual", "query.memory", "task.create",
-            "task.list", "skill.execute", "system.status", "system.shutdown", "unknown",
+            "chitchat",
+            "query.factual",
+            "query.memory",
+            "task.create",
+            "task.list",
+            "skill.execute",
+            "system.status",
+            "system.shutdown",
+            "unknown",
         ]
         emotion = {"valence": 0.3, "arousal": 0.3}
         for intent in intents:
@@ -303,13 +352,18 @@ class TestSubscriberResponseField:
 
     _default_emotion = {"valence": 0.0, "arousal": 0.0, "label": "neutral"}
     _default_personality = {
-        "extraversion": 0.5, "agreeableness": 0.8,
-        "neuroticism": 0.2, "openness": 0.7, "conscientiousness": 0.6,
+        "extraversion": 0.5,
+        "agreeableness": 0.8,
+        "neuroticism": 0.2,
+        "openness": 0.7,
+        "conscientiousness": 0.6,
     }
 
     def test_subscriber_response_is_natural_language(self):
         """_generate_response() called with default context must return plain text."""
-        text = _generate_response("hello", "chitchat", self._default_emotion, self._default_personality)
+        text = _generate_response(
+            "hello", "chitchat", self._default_emotion, self._default_personality
+        )
         assert isinstance(text, str)
         assert len(text) > 0
         # Must not look like raw JSON (the old broken fallback)
@@ -319,7 +373,6 @@ class TestSubscriberResponseField:
         """Simulates what the subscriber now does — result dict must have 'response' key."""
         intent, confidence = _classify_intent("hello there")
         _, sentiment_score = _analyse_sentiment("hello there")
-        sentiment_label = "positive"
         response_text = _generate_response(
             "hello there", intent, self._default_emotion, self._default_personality
         )

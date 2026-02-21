@@ -1,5 +1,7 @@
 """Smoke tests — Grafana health and provisioning"""
+
 import os
+
 import pytest
 
 

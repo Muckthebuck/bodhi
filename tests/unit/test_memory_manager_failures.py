@@ -8,11 +8,13 @@ Verifies:
 - Consolidation: delete failure sets a short TTL instead of losing data
 - Consolidation: Redis distributed lock prevents concurrent duplicate runs
 """
+
 import asyncio
 import json
-import pytest
 import sys
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, call, patch
+
+import pytest
 
 _main = sys.modules["mm_main"]
 StoreRequest = _main.StoreRequest
@@ -30,11 +32,13 @@ class TestStoreRequestBoundaries:
 
     def test_content_over_max_length_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             StoreRequest(content="x" * 10_001, memory_type="episodic", session_id="abc")
 
     def test_content_empty_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             StoreRequest(content="", memory_type="episodic", session_id="abc")
 
@@ -44,11 +48,13 @@ class TestStoreRequestBoundaries:
 
     def test_importance_above_1_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             StoreRequest(content="x", memory_type="working", importance=1.01, session_id="abc")
 
     def test_importance_below_0_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             StoreRequest(content="x", memory_type="working", importance=-0.01, session_id="abc")
 
@@ -85,12 +91,14 @@ class TestConsolidationStoreFault:
         # Lock acquired on first set, released on delete
         mock_redis.set.return_value = True
         mock_redis.scan.return_value = (0, ["working_memory:s1:abc"])
-        mock_redis.get.return_value = json.dumps({
-            "content": "test memory",
-            "importance": 0.9,
-            "session_id": "abc",
-            "metadata": {},
-        })
+        mock_redis.get.return_value = json.dumps(
+            {
+                "content": "test memory",
+                "importance": 0.9,
+                "session_id": "abc",
+                "metadata": {},
+            }
+        )
 
         with (
             patch.object(_main, "_redis", mock_redis),
@@ -108,12 +116,14 @@ class TestConsolidationStoreFault:
         mock_redis = AsyncMock()
         mock_redis.set.return_value = True
         mock_redis.scan.return_value = (0, ["working_memory:s1:abc"])
-        mock_redis.get.return_value = json.dumps({
-            "content": "test memory",
-            "importance": 0.9,
-            "session_id": "abc",
-            "metadata": {},
-        })
+        mock_redis.get.return_value = json.dumps(
+            {
+                "content": "test memory",
+                "importance": 0.9,
+                "session_id": "abc",
+                "metadata": {},
+            }
+        )
 
         with (
             patch.object(_main, "_redis", mock_redis),
@@ -145,12 +155,14 @@ class TestConsolidationDeleteFault:
         mock_redis = AsyncMock()
         mock_redis.set.return_value = True
         mock_redis.scan.return_value = (0, ["working_memory:s1:abc"])
-        mock_redis.get.return_value = json.dumps({
-            "content": "test memory",
-            "importance": 0.9,
-            "session_id": "abc",
-            "metadata": {},
-        })
+        mock_redis.get.return_value = json.dumps(
+            {
+                "content": "test memory",
+                "importance": 0.9,
+                "session_id": "abc",
+                "metadata": {},
+            }
+        )
         # First delete = working memory key (raises), second = lock release (succeeds)
         mock_redis.delete.side_effect = [Exception("Redis flaky"), None]
 

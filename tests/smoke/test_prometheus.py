@@ -1,5 +1,7 @@
 """Smoke tests — Prometheus health and scrape config"""
+
 import os
+
 import pytest
 
 

@@ -8,15 +8,14 @@ from typing import Any
 
 import asyncpg
 import httpx
+import metrics
 import structlog
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, HTTPException, Request
 from neo4j import AsyncGraphDatabase
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
 from redis.asyncio import Redis
-
-import metrics
 
 load_dotenv()
 
@@ -34,14 +33,14 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
 MEMORY_MANAGER_URL = os.getenv("MEMORY_MANAGER_URL", "http://memory-manager:8001")
 
 RESPONSE_TIMEOUT = 5.0
-MEMORY_RETRIEVE_TIMEOUT = 1.0   # fail fast — never block user response
+MEMORY_RETRIEVE_TIMEOUT = 1.0  # fail fast — never block user response
 
 _state: dict[str, Any] = {
     "redis": None,
     "pg_pool": None,
     "neo4j_driver": None,
     "active_agents": set(),
-    "agent_last_seen": {},   # {agent_name: float timestamp}
+    "agent_last_seen": {},  # {agent_name: float timestamp}
     "pending_responses": {},
     "http_client": None,
 }
@@ -97,7 +96,7 @@ async def _redis_subscriber() -> None:
 
             if channel.startswith("language.response."):
                 # channel = language.response.<request_id>
-                request_id = channel[len("language.response."):]
+                request_id = channel[len("language.response.") :]
                 try:
                     payload = json.loads(data)
                     response_text = payload.get("response", json.dumps(payload))
@@ -259,12 +258,14 @@ async def handle_input(body: InputRequest, request: Request) -> InputResponse:
     # Retrieve relevant memories before dispatching (best-effort; never blocks user)
     memory_context = await _fetch_memory_context(body.text, body.session_id)
 
-    payload = json.dumps({
-        "request_id": request_id,
-        "session_id": body.session_id,
-        "text": body.text,
-        "memory_context": memory_context,
-    })
+    payload = json.dumps(
+        {
+            "request_id": request_id,
+            "session_id": body.session_id,
+            "text": body.text,
+            "memory_context": memory_context,
+        }
+    )
     try:
         try:
             await asyncio.wait_for(

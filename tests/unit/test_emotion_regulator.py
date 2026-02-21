@@ -1,5 +1,7 @@
 """Unit tests — emotion-regulator pure logic (no I/O)"""
+
 import sys
+
 import pytest
 
 # Modules pre-loaded once by tests/unit/conftest.py to avoid Prometheus re-registration
@@ -89,10 +91,14 @@ class TestMaxDelta:
 class TestEventEffects:
     def test_all_events_defined(self):
         expected = {
-            "user.positive_feedback", "user.negative_feedback",
-            "user.greeting", "user.farewell",
-            "task.completed", "task.failed",
-            "user.input", "language.response",
+            "user.positive_feedback",
+            "user.negative_feedback",
+            "user.greeting",
+            "user.farewell",
+            "task.completed",
+            "task.failed",
+            "user.input",
+            "language.response",
         }
         assert set(EVENT_EFFECTS.keys()) == expected
 

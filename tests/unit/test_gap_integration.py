@@ -1,16 +1,18 @@
 """Tests for Phase 2 gap integration features:
 
-  - Gap 1: Live emotion state flows from emotion.state_changed → language-center subscriber
-  - Gap 2: Central-agent fetches memory context and injects it into user.input payload
-  - Gap 3: memory-manager /retrieve increments access_count after returning results
+- Gap 1: Live emotion state flows from emotion.state_changed → language-center subscriber
+- Gap 2: Central-agent fetches memory context and injects it into user.input payload
+- Gap 3: memory-manager /retrieve increments access_count after returning results
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import sys
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 _lc = sys.modules["lc_main"]
 _ca = sys.modules["ca_main"]
@@ -20,6 +22,7 @@ _mm = sys.modules["mm_main"]
 # ─────────────────────────────────────────────────────────────────────────────
 # Gap 1: Emotion cache — language-center tracks live emotion state
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestEmotionCache:
     def test_emotion_cache_exists_with_neutral_defaults(self):
@@ -32,50 +35,63 @@ class TestEmotionCache:
     def test_generate_response_uses_emotion_valence(self):
         """High positive vs negative valence → emotion_adj differs → query.memory responses differ."""
         _default_personality = {
-            "extraversion": 0.5, "agreeableness": 0.8,
-            "neuroticism": 0.2, "openness": 0.7, "conscientiousness": 0.6,
+            "extraversion": 0.5,
+            "agreeableness": 0.8,
+            "neuroticism": 0.2,
+            "openness": 0.7,
+            "conscientiousness": 0.6,
         }
         pos_emotion = {"valence": 0.9, "arousal": 0.5, "label": "joy"}
         neg_emotion = {"valence": -0.9, "arousal": 0.5, "label": "sadness"}
 
         # query.memory template always embeds {emotion_adj} so valence affects output
-        pos_response = _lc._generate_response("do you remember that", "query.memory", pos_emotion, _default_personality)
-        neg_response = _lc._generate_response("do you remember that", "query.memory", neg_emotion, _default_personality)
+        pos_response = _lc._generate_response(
+            "do you remember that", "query.memory", pos_emotion, _default_personality
+        )
+        neg_response = _lc._generate_response(
+            "do you remember that", "query.memory", neg_emotion, _default_personality
+        )
 
         assert isinstance(pos_response, str) and len(pos_response) > 0
         assert isinstance(neg_response, str) and len(neg_response) > 0
         # Different emotion_adj → at least one differs in content
         from lc_templates import valence_to_adjective
+
         pos_adj = valence_to_adjective(0.9)
         neg_adj = valence_to_adjective(-0.9)
         assert pos_adj != neg_adj
 
     async def test_subscriber_updates_emotion_cache_on_state_changed(self):
         """Simulating an emotion.state_changed message updates _emotion_cache in-process."""
-        state_payload = json.dumps({
-            "valence": 0.75, "arousal": 0.6, "dominance": 0.4, "label": "happy"
-        })
+        state_payload = json.dumps(
+            {"valence": 0.75, "arousal": 0.6, "dominance": 0.4, "label": "happy"}
+        )
 
         # Simulate what the subscriber does when channel == "emotion.state_changed"
         state = json.loads(state_payload)
-        _lc._emotion_cache.update({
-            "valence": state.get("valence", 0.0),
-            "arousal": state.get("arousal", 0.0),
-            "dominance": state.get("dominance", 0.0),
-            "label": state.get("label", "neutral"),
-        })
+        _lc._emotion_cache.update(
+            {
+                "valence": state.get("valence", 0.0),
+                "arousal": state.get("arousal", 0.0),
+                "dominance": state.get("dominance", 0.0),
+                "label": state.get("label", "neutral"),
+            }
+        )
 
         assert _lc._emotion_cache["valence"] == 0.75
         assert _lc._emotion_cache["label"] == "happy"
 
     async def test_subscriber_uses_cached_emotion_in_generate(self):
         """After cache update, _generate_response is called with the live emotion."""
-        _lc._emotion_cache.update({
-            "valence": 0.8, "arousal": 0.5, "dominance": 0.4, "label": "happy"
-        })
+        _lc._emotion_cache.update(
+            {"valence": 0.8, "arousal": 0.5, "dominance": 0.4, "label": "happy"}
+        )
         default_personality = {
-            "extraversion": 0.5, "agreeableness": 0.8,
-            "neuroticism": 0.2, "openness": 0.7, "conscientiousness": 0.6,
+            "extraversion": 0.5,
+            "agreeableness": 0.8,
+            "neuroticism": 0.2,
+            "openness": 0.7,
+            "conscientiousness": 0.6,
         }
         live_emotion = {
             "valence": _lc._emotion_cache.get("valence", 0.0),
@@ -85,14 +101,21 @@ class TestEmotionCache:
         response = _lc._generate_response("hi", "chitchat", live_emotion, default_personality)
         assert isinstance(response, str)
         # Restores default
-        _lc._emotion_cache.update({"valence": 0.0, "arousal": 0.0, "dominance": 0.0, "label": "neutral"})
+        _lc._emotion_cache.update(
+            {"valence": 0.0, "arousal": 0.0, "dominance": 0.0, "label": "neutral"}
+        )
 
     def test_emotion_cache_fallback_when_empty(self):
         """If emotion cache has default values, generate_response still works."""
-        _lc._emotion_cache.update({"valence": 0.0, "arousal": 0.0, "dominance": 0.0, "label": "neutral"})
+        _lc._emotion_cache.update(
+            {"valence": 0.0, "arousal": 0.0, "dominance": 0.0, "label": "neutral"}
+        )
         default_personality = {
-            "extraversion": 0.5, "agreeableness": 0.8,
-            "neuroticism": 0.2, "openness": 0.7, "conscientiousness": 0.6,
+            "extraversion": 0.5,
+            "agreeableness": 0.8,
+            "neuroticism": 0.2,
+            "openness": 0.7,
+            "conscientiousness": 0.6,
         }
         emotion = {
             "valence": _lc._emotion_cache["valence"],
@@ -107,25 +130,31 @@ class TestEmotionCache:
 # Gap 1b: Memory context in _generate_response
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestMemoryContextInResponse:
     _personality = {
-        "extraversion": 0.5, "agreeableness": 0.8,
-        "neuroticism": 0.2, "openness": 0.7, "conscientiousness": 0.6,
+        "extraversion": 0.5,
+        "agreeableness": 0.8,
+        "neuroticism": 0.2,
+        "openness": 0.7,
+        "conscientiousness": 0.6,
     }
     _emotion = {"valence": 0.0, "arousal": 0.0, "label": "neutral"}
 
     def test_memory_context_prepends_recall_note(self):
         response = _lc._generate_response(
-            "hello", "chitchat", self._emotion, self._personality,
-            memory_context=["We talked about Paris last Tuesday"]
+            "hello",
+            "chitchat",
+            self._emotion,
+            self._personality,
+            memory_context=["We talked about Paris last Tuesday"],
         )
         assert "[Remembering:" in response
 
     def test_memory_context_truncates_long_snippet(self):
         long_memory = "A" * 200
         response = _lc._generate_response(
-            "hello", "chitchat", self._emotion, self._personality,
-            memory_context=[long_memory]
+            "hello", "chitchat", self._emotion, self._personality, memory_context=[long_memory]
         )
         # Recall snippet is ≤80 chars
         start = response.index("[Remembering:") + len('[Remembering: "')
@@ -134,22 +163,23 @@ class TestMemoryContextInResponse:
 
     def test_no_memory_context_no_recall_note(self):
         response = _lc._generate_response(
-            "hello", "chitchat", self._emotion, self._personality,
-            memory_context=[]
+            "hello", "chitchat", self._emotion, self._personality, memory_context=[]
         )
         assert "[Remembering:" not in response
 
     def test_none_memory_context_no_recall_note(self):
         response = _lc._generate_response(
-            "hello", "chitchat", self._emotion, self._personality,
-            memory_context=None
+            "hello", "chitchat", self._emotion, self._personality, memory_context=None
         )
         assert "[Remembering:" not in response
 
     def test_only_first_memory_is_used(self):
         response = _lc._generate_response(
-            "hello", "chitchat", self._emotion, self._personality,
-            memory_context=["First memory", "Second memory"]
+            "hello",
+            "chitchat",
+            self._emotion,
+            self._personality,
+            memory_context=["First memory", "Second memory"],
         )
         assert "First memory" in response
         assert "Second memory" not in response
@@ -158,6 +188,7 @@ class TestMemoryContextInResponse:
 # ─────────────────────────────────────────────────────────────────────────────
 # Gap 2: Central-agent fetches memory context
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestFetchMemoryContext:
     async def test_returns_empty_list_when_no_http_client(self):
@@ -238,7 +269,11 @@ class TestFetchMemoryContext:
         try:
             await _ca._fetch_memory_context("hello", "my-session-42")
             call_kwargs = mock_client.post.call_args
-            body = call_kwargs.kwargs.get("json") or call_kwargs.args[1] if len(call_kwargs.args) > 1 else call_kwargs.kwargs["json"]
+            body = (
+                call_kwargs.kwargs.get("json") or call_kwargs.args[1]
+                if len(call_kwargs.args) > 1
+                else call_kwargs.kwargs["json"]
+            )
             assert body.get("session_id") == "my-session-42"
         finally:
             _ca._state["http_client"] = original
@@ -262,8 +297,6 @@ class TestFetchMemoryContext:
         _ca._state["redis"] = mock_redis
 
         with patch.object(_ca, "_fetch_memory_context", new=AsyncMock(return_value=["memory A"])):
-            future = asyncio.get_event_loop().create_future()
-            request_id_holder: list[str] = []
 
             async def fake_get_future(*args, **kwargs):
                 return "hello response"
@@ -275,14 +308,17 @@ class TestFetchMemoryContext:
                     # Can't call handle_input directly without app context
                     # Instead, verify payload construction logic directly
                     import uuid
+
                     request_id = str(uuid.uuid4())
                     memory_context = ["memory A"]
-                    payload = json.dumps({
-                        "request_id": request_id,
-                        "session_id": req.session_id,
-                        "text": req.text,
-                        "memory_context": memory_context,
-                    })
+                    payload = json.dumps(
+                        {
+                            "request_id": request_id,
+                            "session_id": req.session_id,
+                            "text": req.text,
+                            "memory_context": memory_context,
+                        }
+                    )
                     parsed = json.loads(payload)
                     assert parsed["memory_context"] == ["memory A"]
                     assert parsed["text"] == "hi"
@@ -294,6 +330,7 @@ class TestFetchMemoryContext:
 # ─────────────────────────────────────────────────────────────────────────────
 # Gap 3: Memory-manager increments access_count after retrieve
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestAccessCountTracking:
     async def test_access_count_updated_after_retrieve(self):

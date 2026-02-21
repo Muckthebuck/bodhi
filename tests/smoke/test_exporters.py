@@ -1,5 +1,7 @@
 """Smoke tests — Prometheus exporters (node, postgres, redis)"""
+
 import os
+
 import pytest
 
 
@@ -41,6 +43,4 @@ class TestPrometheusTargetHealth:
     def test_target_is_up(self, http, job):
         by_job = self._targets_by_job(http)
         assert job in by_job, f"Prometheus has no active target for job '{job}'"
-        assert by_job[job] == "up", (
-            f"Prometheus target '{job}' is not up (health={by_job[job]})"
-        )
+        assert by_job[job] == "up", f"Prometheus target '{job}' is not up (health={by_job[job]})"

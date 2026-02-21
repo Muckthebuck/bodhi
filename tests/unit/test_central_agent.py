@@ -1,6 +1,8 @@
 """Unit tests — central-agent pure logic (no I/O)"""
-import sys
+
 import asyncio
+import sys
+
 import pytest
 
 _main = sys.modules["ca_main"]
@@ -17,12 +19,14 @@ class TestInputRequestValidation:
 
     def test_missing_text_raises(self):
         from pydantic import ValidationError
+
         InputRequest = _main.InputRequest
         with pytest.raises(ValidationError):
             InputRequest(session_id="abc")
 
     def test_missing_session_id_raises(self):
         from pydantic import ValidationError
+
         InputRequest = _main.InputRequest
         with pytest.raises(ValidationError):
             InputRequest(text="hello")
@@ -94,6 +98,7 @@ class TestStatusResponse:
             "pg_pool": object(),
         }
         import psutil
+
         process = psutil.Process()
         response = {
             "memory_mb": round(process.memory_info().rss / 1024 / 1024, 1),

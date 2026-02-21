@@ -6,13 +6,14 @@ Verifies:
 - Concurrent personality reads/writes are consistent (no torn reads)
 - EVENT_EFFECTS keys are validated at startup
 """
+
 import asyncio
 import copy
-import pytest
 import sys
 from unittest.mock import AsyncMock, patch
 
-import sys
+import pytest
+
 _er = sys.modules["er_main"]
 _mm = sys.modules["mm_main"]
 
@@ -101,10 +102,9 @@ class TestPersonalityConcurrency:
             seen_values.append(val)
             await asyncio.sleep(0)
 
-        tasks = (
-            [asyncio.create_task(writer(i)) for i in range(50)]
-            + [asyncio.create_task(reader()) for _ in range(50)]
-        )
+        tasks = [asyncio.create_task(writer(i)) for i in range(50)] + [
+            asyncio.create_task(reader()) for _ in range(50)
+        ]
         await asyncio.gather(*tasks, return_exceptions=True)
 
         for val in seen_values:
@@ -121,13 +121,10 @@ class TestPersonalityConcurrency:
             await asyncio.sleep(0)
 
         with patch.object(_er, "_redis_client", None):
-            tasks = (
-                [asyncio.create_task(do_put()) for _ in range(20)]
-                + [
-                    asyncio.create_task(_er._apply_event("user.positive_feedback", 0.3))
-                    for _ in range(20)
-                ]
-            )
+            tasks = [asyncio.create_task(do_put()) for _ in range(20)] + [
+                asyncio.create_task(_er._apply_event("user.positive_feedback", 0.3))
+                for _ in range(20)
+            ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
         errors = [r for r in results if isinstance(r, Exception)]
@@ -165,10 +162,7 @@ class TestEventEffectsValidation:
         broken = copy.deepcopy(dict(_er.EVENT_EFFECTS))
         broken["user.positive_feedback"] = {"vlaence": 0.3, "arousal": 0.1, "dominance": 0.1}
 
-        invalid = [
-            event for event, effects in broken.items()
-            if set(effects.keys()) != valid_vad
-        ]
+        invalid = [event for event, effects in broken.items() if set(effects.keys()) != valid_vad]
         assert invalid == ["user.positive_feedback"]
 
 

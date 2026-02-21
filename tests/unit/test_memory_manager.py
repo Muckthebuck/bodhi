@@ -1,5 +1,7 @@
 """Unit tests — memory-manager pure logic (no I/O)"""
+
 import sys
+
 import pytest
 
 _main = sys.modules["mm_main"]
@@ -38,6 +40,7 @@ class TestStoreRequestValidation:
 
     def test_invalid_memory_type_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             StoreRequest(
                 content="bad",
@@ -48,6 +51,7 @@ class TestStoreRequestValidation:
 
     def test_missing_content_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             StoreRequest(memory_type="episodic", importance=0.5, session_id="abc")
 
@@ -68,6 +72,7 @@ class TestRetrieveRequestValidation:
 
     def test_missing_query_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             RetrieveRequest(limit=5)
 

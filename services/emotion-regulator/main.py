@@ -7,16 +7,15 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import asyncpg
+import metrics as m
 import redis.asyncio as aioredis
 import structlog
 import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field, field_validator
-
-import metrics as m
 
 load_dotenv()
 
@@ -42,12 +41,12 @@ BASELINE = {"valence": 0.1, "arousal": 0.3, "dominance": 0.5}
 EVENT_EFFECTS: dict[str, dict[str, float]] = {
     "user.positive_feedback": {"valence": +0.3, "arousal": +0.1, "dominance": +0.1},
     "user.negative_feedback": {"valence": -0.2, "arousal": +0.2, "dominance": -0.1},
-    "user.greeting":          {"valence": +0.2, "arousal": +0.2, "dominance": 0.0},
-    "user.farewell":          {"valence": +0.1, "arousal": -0.2, "dominance": 0.0},
-    "task.completed":         {"valence": +0.2, "arousal": +0.1, "dominance": +0.2},
-    "task.failed":            {"valence": -0.1, "arousal": +0.1, "dominance": -0.1},
-    "user.input":             {"valence": +0.05, "arousal": +0.1, "dominance": 0.0},
-    "language.response":      {"valence": 0.0,  "arousal": -0.05, "dominance": 0.0},
+    "user.greeting": {"valence": +0.2, "arousal": +0.2, "dominance": 0.0},
+    "user.farewell": {"valence": +0.1, "arousal": -0.2, "dominance": 0.0},
+    "task.completed": {"valence": +0.2, "arousal": +0.1, "dominance": +0.2},
+    "task.failed": {"valence": -0.1, "arousal": +0.1, "dominance": -0.1},
+    "user.input": {"valence": +0.05, "arousal": +0.1, "dominance": 0.0},
+    "language.response": {"valence": 0.0, "arousal": -0.05, "dominance": 0.0},
 }
 
 # Validate at import time — before any I/O opens, so failures are clean with no leaks
@@ -176,16 +175,20 @@ async def _publish_state() -> None:
     async with _state_lock:
         snapshot = dict(vad_current)
         label = _derive_label(
-            snapshot["valence"], snapshot["arousal"], snapshot["dominance"],
+            snapshot["valence"],
+            snapshot["arousal"],
+            snapshot["dominance"],
             personality.get("openness", DEFAULT_PERSONALITY["openness"]),
         )
 
-    payload = json.dumps({
-        "valence": snapshot["valence"],
-        "arousal": snapshot["arousal"],
-        "dominance": snapshot["dominance"],
-        "label": label,
-    })
+    payload = json.dumps(
+        {
+            "valence": snapshot["valence"],
+            "arousal": snapshot["arousal"],
+            "dominance": snapshot["dominance"],
+            "label": label,
+        }
+    )
     try:
         await _redis_client.publish("emotion.state_changed", payload)
     except Exception as exc:
@@ -253,7 +256,11 @@ async def _redis_subscriber() -> None:
         except (json.JSONDecodeError, TypeError):
             data = {}
 
-        base_channel = channel.split(".")[0] + "." + channel.split(".")[1] if channel.count(".") >= 1 else channel
+        base_channel = (
+            channel.split(".")[0] + "." + channel.split(".")[1]
+            if channel.count(".") >= 1
+            else channel
+        )
         event_type = channel if channel in EVENT_EFFECTS else base_channel
         intensity = float(data.get("intensity", 1.0))
         log.debug("redis_message", channel=channel, event_type=event_type)
@@ -344,7 +351,9 @@ async def get_state() -> dict[str, Any]:
         target = dict(vad_target)
 
     label = _derive_label(
-        current["valence"], current["arousal"], current["dominance"],
+        current["valence"],
+        current["arousal"],
+        current["dominance"],
         personality.get("openness", DEFAULT_PERSONALITY["openness"]),
     )
     progress = {
@@ -368,7 +377,9 @@ async def update_emotion(body: UpdateRequest) -> dict[str, Any]:
     async with _state_lock:
         current = dict(vad_current)
     label = _derive_label(
-        current["valence"], current["arousal"], current["dominance"],
+        current["valence"],
+        current["arousal"],
+        current["dominance"],
         personality.get("openness", DEFAULT_PERSONALITY["openness"]),
     )
     return {"status": "ok", "label": label, "current": current}

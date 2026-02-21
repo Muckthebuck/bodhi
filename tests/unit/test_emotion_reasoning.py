@@ -4,7 +4,9 @@ Semantic reasoning tests — emotion-regulator
 Tests sequential event accumulation, transition direction consistency,
 overflow clamping under adversarial inputs, and drift-toward-baseline logic.
 """
+
 import sys
+
 import pytest
 
 _main = sys.modules["er_main"]
@@ -22,6 +24,7 @@ DRIFT_RATE = _main.DRIFT_RATE
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _apply_event_to_state(
     vad: dict[str, float], event_type: str, intensity: float = 1.0
@@ -71,6 +74,7 @@ def _tick(current: dict, target: dict, steps: int = 1) -> tuple[dict, dict]:
 # Sequential event accumulation
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestEventAccumulation:
     """Multiple positive events should push state further than one event."""
 
@@ -90,7 +94,10 @@ class TestEventAccumulation:
 
     def test_farewell_decreases_arousal(self):
         after = _apply_events(["user.farewell"])
-        assert after["arousal"] < BASELINE["arousal"] + EVENT_EFFECTS["user.farewell"]["arousal"] + 0.01
+        assert (
+            after["arousal"]
+            < BASELINE["arousal"] + EVENT_EFFECTS["user.farewell"]["arousal"] + 0.01
+        )
 
     def test_task_completed_increases_dominance(self):
         after = _apply_events(["task.completed"])
@@ -122,6 +129,7 @@ class TestEventAccumulation:
 # ─────────────────────────────────────────────────────────────────────────────
 # Transition direction consistency
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestTransitionDirectionConsistency:
     """The current state must always move monotonically toward the target."""
@@ -169,6 +177,7 @@ class TestTransitionDirectionConsistency:
 # Drift toward baseline
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestDriftTowardBaseline:
     """Without new events, the target should slowly drift back to baseline."""
 
@@ -191,8 +200,9 @@ class TestDriftTowardBaseline:
         for _ in range(100):
             current, target = _tick(current, target, steps=1)
         for dim in ("valence", "arousal", "dominance"):
-            assert abs(target[dim] - BASELINE[dim]) < 0.05, \
+            assert abs(target[dim] - BASELINE[dim]) < 0.05, (
                 f"{dim}: target={target[dim]:.3f}, baseline={BASELINE[dim]:.3f}"
+            )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -200,20 +210,23 @@ class TestDriftTowardBaseline:
 # Labels should follow logically from VAD state
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestEmotionLabelReasoning:
     """Verify the label derivation logic is self-consistent."""
 
     def test_positive_events_eventually_produce_positive_label(self):
         state = _apply_events(["user.positive_feedback"] * 5)
         label = _derive_label(state["valence"], state["arousal"], state["dominance"], 0.8)
-        assert label in ("excited", "happy", "content"), \
+        assert label in ("excited", "happy", "content"), (
             f"Expected positive label, got '{label}' for state {state}"
+        )
 
     def test_failure_events_produce_negative_label(self):
         state = _apply_events(["task.failed"] * 5)
         label = _derive_label(state["valence"], state["arousal"], state["dominance"], 0.5)
-        assert label in ("sad", "anxious", "frustrated"), \
+        assert label in ("sad", "anxious", "frustrated"), (
             f"Expected negative label, got '{label}' for state {state}"
+        )
 
     def test_label_is_string(self):
         for v in [-0.8, -0.3, 0.0, 0.3, 0.8]:
@@ -223,16 +236,18 @@ class TestEmotionLabelReasoning:
                 assert len(label) > 0
 
     def test_baseline_state_produces_calm_or_curious(self):
-        label = _derive_label(
-            BASELINE["valence"], BASELINE["arousal"], BASELINE["dominance"], 0.8
-        )
-        assert label in ("calm", "curious", "content"), \
+        label = _derive_label(BASELINE["valence"], BASELINE["arousal"], BASELINE["dominance"], 0.8)
+        assert label in ("calm", "curious", "content"), (
             f"Baseline should be calm/curious/content, got '{label}'"
+        )
 
-    @pytest.mark.parametrize("openness,expected", [
-        (0.9, "curious"),
-        (0.5, "calm"),
-    ])
+    @pytest.mark.parametrize(
+        "openness,expected",
+        [
+            (0.9, "curious"),
+            (0.5, "calm"),
+        ],
+    )
     def test_openness_determines_calm_vs_curious(self, openness, expected):
         # At neutral VAD, openness tips the label
         label = _derive_label(0.1, 0.3, 0.5, openness)
@@ -242,6 +257,7 @@ class TestEmotionLabelReasoning:
 # ─────────────────────────────────────────────────────────────────────────────
 # Intensity scaling
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestIntensityScaling:
     """Higher intensity should produce larger state changes."""

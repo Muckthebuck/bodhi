@@ -1,6 +1,8 @@
 """Smoke tests — Loki log ingestion endpoint"""
+
 import os
 import time
+
 import pytest
 
 

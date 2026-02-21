@@ -4,9 +4,11 @@ Mock fixtures that simulate dependency failures.
 These are imported by unit tests that need to exercise fault-handling paths
 without real infrastructure. All fixtures return pre-configured AsyncMocks.
 """
+
 import asyncio
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 
 @pytest.fixture

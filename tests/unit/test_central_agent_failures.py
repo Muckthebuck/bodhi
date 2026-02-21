@@ -6,10 +6,12 @@ Verifies:
 - Publish timeout raises TimeoutError within the expected window
 - session_id / text field boundary validation
 """
+
 import asyncio
 import json
-import pytest
 import sys
+
+import pytest
 
 _main = sys.modules["ca_main"]
 InputRequest = _main.InputRequest
@@ -29,6 +31,7 @@ class TestInputRequestBoundaries:
 
     def test_text_over_max_length_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             InputRequest(text="x" * 2_001, session_id="abc")
 
@@ -38,22 +41,26 @@ class TestInputRequestBoundaries:
 
     def test_session_id_empty_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             InputRequest(text="hi", session_id="")
 
     def test_session_id_with_slash_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             InputRequest(text="hi", session_id="session/123")
 
     def test_session_id_with_space_rejected(self):
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             InputRequest(text="hi", session_id="session 123")
 
     def test_session_id_xss_rejected(self):
         """XSS-style input must be rejected by pattern validator."""
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError):
             InputRequest(text="hi", session_id="<script>")
 
@@ -100,7 +107,7 @@ class TestSubscriberMessageParsing:
             data: str = message["data"]
 
             if channel.startswith("language.response."):
-                request_id = channel[len("language.response."):]
+                request_id = channel[len("language.response.") :]
                 try:
                     payload = json.loads(data)
                     response_text = payload.get("response", json.dumps(payload))

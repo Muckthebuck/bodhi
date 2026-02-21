@@ -9,18 +9,17 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import asyncpg
+import metrics
 import redis.asyncio as aioredis
 import structlog
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client.models import Distance, PointStruct, VectorParams
-
-import metrics
 
 load_dotenv()
 
@@ -52,6 +51,7 @@ def _get_embedder():
     global _embedder
     if _embedder is None:
         from sentence_transformers import SentenceTransformer
+
         _embedder = SentenceTransformer(EMBEDDING_MODEL)
     return _embedder
 
@@ -96,7 +96,9 @@ async def _subscribe_user_input() -> None:
                 }
             )
             await _redis.setex(key, WORKING_MEMORY_TTL, payload)
-            await _redis.publish("memory.stored", json.dumps({"key": key, "memory_type": "working"}))
+            await _redis.publish(
+                "memory.stored", json.dumps({"key": key, "memory_type": "working"})
+            )
             metrics.memory_stored_total.labels(memory_type="working").inc()
         except Exception as exc:
             log.warning("user_input_store_failed", error=str(exc))
@@ -127,13 +129,17 @@ async def _run_consolidation() -> None:
                     max_iterations = 500
                     iteration = 0
                     while True:
-                        cursor, partial = await _redis.scan(cursor, match="working_memory:*", count=1000)
+                        cursor, partial = await _redis.scan(
+                            cursor, match="working_memory:*", count=1000
+                        )
                         keys.extend(partial)
                         iteration += 1
                         if cursor == 0 or iteration >= max_iterations:
                             break
                     if iteration >= max_iterations:
-                        log.error("consolidation_scan_truncated_data_loss_possible", keys_found=len(keys))
+                        log.error(
+                            "consolidation_scan_truncated_data_loss_possible", keys_found=len(keys)
+                        )
             except asyncio.TimeoutError:
                 log.warning("consolidation_scan_timeout", keys_found=len(keys))
 
@@ -181,7 +187,9 @@ async def _run_consolidation() -> None:
                 try:
                     await _redis.delete(key)
                 except Exception as del_exc:
-                    log.warning("consolidation_delete_failed_setting_expiry", key=key, error=str(del_exc))
+                    log.warning(
+                        "consolidation_delete_failed_setting_expiry", key=key, error=str(del_exc)
+                    )
                     try:
                         await _redis.expire(key, 300)  # 5 min << 30 min interval
                     except Exception:
@@ -207,16 +215,16 @@ async def _store_episodic(
     async with asyncio.timeout(5.0):
         async with _pg_pool.acquire() as conn:
             row = await conn.fetchrow(
-            """
+                """
             INSERT INTO memories (session_id, content, memory_type, importance, metadata)
             VALUES ($1, $2, 'episodic', $3, $4)
             RETURNING memory_id
             """,
-            session_id,
-            content,
-            importance,
-            json.dumps(metadata),
-        )
+                session_id,
+                content,
+                importance,
+                json.dumps(metadata),
+            )
     memory_id = str(row["memory_id"])
     await _redis.publish(
         "memory.stored",
@@ -384,9 +392,7 @@ async def store_memory(req: StoreRequest) -> StoreResponse:
             )
 
         metrics.memory_stored_total.labels(memory_type=req.memory_type).inc()
-        metrics.memory_latency_seconds.labels(operation="store").observe(
-            time.perf_counter() - t0
-        )
+        metrics.memory_latency_seconds.labels(operation="store").observe(time.perf_counter() - t0)
         return StoreResponse(id=result_id, memory_type=req.memory_type)
 
     except Exception as exc:
@@ -400,15 +406,22 @@ async def retrieve_memories(req: RetrieveRequest) -> list[MemoryResult]:
     try:
         vector = await _embed(req.query)
         search_filter = None
-        must_conditions = []
+        must_conditions: list[Any] = []
         if req.memory_type and req.memory_type != "all":
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
-            must_conditions.append(FieldCondition(key="memory_type", match=MatchValue(value=req.memory_type)))
+            from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+            must_conditions.append(
+                FieldCondition(key="memory_type", match=MatchValue(value=req.memory_type))
+            )
         if req.session_id:
-            from qdrant_client.models import Filter, FieldCondition, MatchValue
-            must_conditions.append(FieldCondition(key="session_id", match=MatchValue(value=req.session_id)))
+            from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+            must_conditions.append(
+                FieldCondition(key="session_id", match=MatchValue(value=req.session_id))
+            )
         if must_conditions:
             from qdrant_client.models import Filter
+
             search_filter = Filter(must=must_conditions)
 
         hits = await _qdrant.search(

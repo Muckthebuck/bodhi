@@ -4,12 +4,14 @@ Infrastructure validation tests.
 Config/compose file checks use YAML parsing (no docker CLI needed).
 Service health checks use protocol-native connections (runs inside the network).
 """
+
 import os
 import re
 import subprocess
+from pathlib import Path
+
 import pytest
 import yaml
-from pathlib import Path
 
 ROOT = Path(__file__).parent.parent.parent
 
@@ -31,23 +33,30 @@ class TestComposeConfig:
         Internal bodhi/* images are exempt as they are always built locally."""
         compose = (ROOT / "docker-compose.yml").read_text()
         latest_lines = [
-            line.strip() for line in compose.splitlines()
-            if re.search(r"image:.*:latest", line)
-            and not re.search(r"image:\s*bodhi/", line)
+            line.strip()
+            for line in compose.splitlines()
+            if re.search(r"image:.*:latest", line) and not re.search(r"image:\s*bodhi/", line)
         ]
-        assert not latest_lines, "Found :latest tags on external images:\n" + "\n".join(latest_lines)
+        assert not latest_lines, "Found :latest tags on external images:\n" + "\n".join(
+            latest_lines
+        )
 
     def test_no_deploy_resources_blocks(self):
         """deploy.resources.limits is Swarm-only and silently ignored — must not exist."""
         compose = (ROOT / "docker-compose.yml").read_text()
-        assert "deploy:" not in compose, \
+        assert "deploy:" not in compose, (
             "Found 'deploy:' in docker-compose.yml — use mem_limit/cpus instead"
+        )
 
     def test_env_example_has_all_required_keys(self):
         """Every key in .env.example must be documented."""
         required = {"POSTGRES_PASSWORD", "NEO4J_PASSWORD", "GRAFANA_PASSWORD"}
         env_text = (ROOT / ".env.example").read_text()
-        present = {line.split("=")[0] for line in env_text.splitlines() if "=" in line and not line.startswith("#")}
+        present = {
+            line.split("=")[0]
+            for line in env_text.splitlines()
+            if "=" in line and not line.startswith("#")
+        }
         missing = required - present
         assert not missing, f"Keys missing from .env.example: {missing}"
 
@@ -87,6 +96,7 @@ class TestAllServicesHealthy:
 
     def test_redis_healthy(self):
         import redis as redis_lib
+
         host = os.getenv("REDIS_HOST", "localhost")
         client = redis_lib.Redis(host=host, port=6379, socket_connect_timeout=5)
         assert client.ping(), "Redis did not respond to PING"

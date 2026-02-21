@@ -24,14 +24,13 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import PlainTextResponse
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-from pydantic import BaseModel, Field
-
 from metrics import (
     intent_classified_total,
     language_latency_seconds,
     language_requests_total,
 )
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from pydantic import BaseModel, Field
 from templates import TEMPLATES, valence_to_adjective
 
 load_dotenv()
@@ -68,7 +67,9 @@ _INTENT_PATTERNS: list[tuple[str, list[re.Pattern[str]]]] = [
         "system.shutdown",
         [
             # Anchored to start so mid-sentence "I said goodnight" doesn't trigger shutdown
-            re.compile(r"^(goodnight|good night|bye|goodbye|shutdown|shut down|sleep|see you)\b", re.I),
+            re.compile(
+                r"^(goodnight|good night|bye|goodbye|shutdown|shut down|sleep|see you)\b", re.I
+            ),
         ],
     ),
     (
@@ -80,13 +81,19 @@ _INTENT_PATTERNS: list[tuple[str, list[re.Pattern[str]]]] = [
     (
         "task.create",
         [
-            re.compile(r"\b(remind me|set a reminder|create (a )?(task|reminder)|add (a )?(task|reminder)|remember to)\b", re.I),
+            re.compile(
+                r"\b(remind me|set a reminder|create (a )?(task|reminder)|add (a )?(task|reminder)|remember to)\b",
+                re.I,
+            ),
         ],
     ),
     (
         "task.list",
         [
-            re.compile(r"\b(list (my )?(tasks?|reminders?)|what('s| is) on my (list|agenda)|show (me )?(my )?(tasks?|reminders?))\b", re.I),
+            re.compile(
+                r"\b(list (my )?(tasks?|reminders?)|what('s| is) on my (list|agenda)|show (me )?(my )?(tasks?|reminders?))\b",
+                re.I,
+            ),
         ],
     ),
     (
@@ -104,13 +111,18 @@ _INTENT_PATTERNS: list[tuple[str, list[re.Pattern[str]]]] = [
     (
         "query.factual",
         [
-            re.compile(r"\b(what is|what are|who is|who are|when did|where is|how does|tell me about|explain|define)\b", re.I),
+            re.compile(
+                r"\b(what is|what are|who is|who are|when did|where is|how does|tell me about|explain|define)\b",
+                re.I,
+            ),
         ],
     ),
     (
         "chitchat",
         [
-            re.compile(r"\b(hi|hello|hey|sup|what'?s up|how'?s it going|hola|howdy|greetings)\b", re.I),
+            re.compile(
+                r"\b(hi|hello|hey|sup|what'?s up|how'?s it going|hola|howdy|greetings)\b", re.I
+            ),
             re.compile(r"\bhow are you\b", re.I),
         ],
     ),
@@ -136,6 +148,7 @@ _NAME_PATTERN = re.compile(r"\b(?:my name is|i'?m|call me)\s+([A-Z][a-z]+)\b")
 # ---------------------------------------------------------------------------
 # Model helpers (lazy load)
 # ---------------------------------------------------------------------------
+
 
 def _load_model_sync() -> bool:
     """Load distilbert tokenizer/model synchronously (called in executor)."""
@@ -170,6 +183,7 @@ async def _ensure_model() -> None:
 # ---------------------------------------------------------------------------
 # NLU helpers
 # ---------------------------------------------------------------------------
+
 
 def _classify_intent(text: str) -> tuple[str, float]:
     """Pattern-based intent classification.  Returns (intent, confidence)."""
@@ -207,6 +221,7 @@ def _analyse_sentiment(text: str) -> tuple[str, float]:
 # ---------------------------------------------------------------------------
 # NLG helpers
 # ---------------------------------------------------------------------------
+
 
 def _personality_tone(personality: dict[str, float]) -> dict[str, Any]:
     """Derive tone modifiers from Big Five scores."""
@@ -271,7 +286,7 @@ def _generate_response(
     # Prepend a brief memory recall note when relevant past context exists
     if memory_context:
         recall = memory_context[0][:80].rstrip()
-        text = f"[Remembering: \"{recall}\"...] {text}"
+        text = f'[Remembering: "{recall}"...] {text}'
 
     # Cautious suffix for high neuroticism
     if tone["caution"]:
@@ -283,6 +298,7 @@ def _generate_response(
 # ---------------------------------------------------------------------------
 # Pydantic schemas
 # ---------------------------------------------------------------------------
+
 
 class UnderstandRequest(BaseModel):
     text: str
@@ -331,6 +347,7 @@ class SentimentResponse(BaseModel):
 # Redis subscriber
 # ---------------------------------------------------------------------------
 
+
 async def _redis_subscriber(redis_client: aioredis.Redis) -> None:
     pubsub = redis_client.pubsub()
     await pubsub.subscribe("user.input", "emotion.state_changed")
@@ -346,12 +363,14 @@ async def _redis_subscriber(redis_client: aioredis.Redis) -> None:
             # ----------------------------------------------------------------
             if channel == "emotion.state_changed":
                 state = json.loads(message["data"])
-                _emotion_cache.update({
-                    "valence": state.get("valence", 0.0),
-                    "arousal": state.get("arousal", 0.0),
-                    "dominance": state.get("dominance", 0.0),
-                    "label": state.get("label", "neutral"),
-                })
+                _emotion_cache.update(
+                    {
+                        "valence": state.get("valence", 0.0),
+                        "arousal": state.get("arousal", 0.0),
+                        "dominance": state.get("dominance", 0.0),
+                        "label": state.get("label", "neutral"),
+                    }
+                )
                 log.debug("emotion_cache_updated", label=_emotion_cache["label"])
                 continue
 
@@ -375,8 +394,11 @@ async def _redis_subscriber(redis_client: aioredis.Redis) -> None:
                 "label": _emotion_cache.get("label", sentiment_label),
             }
             _default_personality = {
-                "extraversion": 0.5, "agreeableness": 0.8,
-                "neuroticism": 0.2, "openness": 0.7, "conscientiousness": 0.6,
+                "extraversion": 0.5,
+                "agreeableness": 0.8,
+                "neuroticism": 0.2,
+                "openness": 0.7,
+                "conscientiousness": 0.6,
             }
             response_text = _generate_response(
                 text, intent, live_emotion, _default_personality, memory_context
@@ -402,6 +424,7 @@ async def _redis_subscriber(redis_client: aioredis.Redis) -> None:
 # ---------------------------------------------------------------------------
 # App lifecycle
 # ---------------------------------------------------------------------------
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -432,6 +455,7 @@ app = FastAPI(title="language-center", version=SERVICE_VERSION, lifespan=lifespa
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @app.get("/health")
 async def health() -> dict[str, Any]:

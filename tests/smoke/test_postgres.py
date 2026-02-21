@@ -1,12 +1,18 @@
 """Smoke tests — PostgreSQL schema and data integrity"""
+
 import pytest
 
 
 @pytest.mark.smoke
 class TestPostgres:
     EXPECTED_TABLES = {
-        "memories", "skills", "skill_executions",
-        "tool_permissions", "tool_audit_log", "settings", "conversations",
+        "memories",
+        "skills",
+        "skill_executions",
+        "tool_permissions",
+        "tool_audit_log",
+        "settings",
+        "conversations",
     }
 
     def test_connection(self, pg_conn):
@@ -51,6 +57,7 @@ class TestPostgres:
     def test_skill_executions_fk_enforced(self, pg_conn):
         """skill_executions.skill_id must reference skills.skill_id."""
         import psycopg2
+
         with pg_conn.cursor() as cur:
             try:
                 cur.execute("""
@@ -62,20 +69,26 @@ class TestPostgres:
             except psycopg2.errors.ForeignKeyViolation:
                 pg_conn.rollback()  # expected — FK is enforced
 
-    @pytest.mark.parametrize("table,col", [
-        ("memories", "memory_id"),
-        ("skills", "id"),
-        ("skill_executions", "id"),
-        ("tool_permissions", "id"),
-        ("tool_audit_log", "id"),
-        ("conversations", "id"),
-    ])
+    @pytest.mark.parametrize(
+        "table,col",
+        [
+            ("memories", "memory_id"),
+            ("skills", "id"),
+            ("skill_executions", "id"),
+            ("tool_permissions", "id"),
+            ("tool_audit_log", "id"),
+            ("conversations", "id"),
+        ],
+    )
     def test_uuid_primary_keys(self, pg_conn, table, col):
         with pg_conn.cursor() as cur:
-            cur.execute(f"""
+            cur.execute(
+                """
                 SELECT data_type FROM information_schema.columns
                 WHERE table_name = %s AND column_name = %s
-            """, (table, col))
+            """,
+                (table, col),
+            )
             row = cur.fetchone()
         assert row is not None
         assert row[0] == "uuid", f"{table}.{col} is not UUID type"

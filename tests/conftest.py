@@ -7,10 +7,12 @@ Service hostnames are configurable via environment variables so the
 same test suite runs both locally (defaults → localhost) and inside
 the Docker network (set via the test-runner service in docker-compose.dev.yml).
 """
+
 import os
+from pathlib import Path
+
 import pytest
 import requests
-from pathlib import Path
 from dotenv import load_dotenv
 
 _ROOT = Path(__file__).parent.parent
@@ -24,19 +26,21 @@ else:
 
 # ── Connection details from env ───────────────────────────────────────────────
 
+
 def _env(key: str, default: str = "") -> str:
     return os.environ.get(key, default)
 
 
 # Infra hosts — override when running inside Docker network
-_REDIS_HOST      = _env("REDIS_HOST",      "localhost")
-_POSTGRES_HOST   = _env("POSTGRES_HOST",   "localhost")
-_NEO4J_HOST      = _env("NEO4J_HOST",      "localhost")
+_REDIS_HOST = _env("REDIS_HOST", "localhost")
+_POSTGRES_HOST = _env("POSTGRES_HOST", "localhost")
+_NEO4J_HOST = _env("NEO4J_HOST", "localhost")
 
 
 @pytest.fixture(scope="session")
 def pg_conn():
     import psycopg2
+
     conn = psycopg2.connect(
         host=_POSTGRES_HOST,
         port=5432,
@@ -51,6 +55,7 @@ def pg_conn():
 @pytest.fixture(scope="session")
 def redis_client():
     import redis as redis_lib
+
     client = redis_lib.Redis(host=_REDIS_HOST, port=6379, decode_responses=True)
     yield client
     client.close()
@@ -59,6 +64,7 @@ def redis_client():
 @pytest.fixture(scope="session")
 def neo4j_driver():
     from neo4j import GraphDatabase
+
     driver = GraphDatabase.driver(
         f"bolt://{_NEO4J_HOST}:7687",
         auth=("neo4j", _env("NEO4J_PASSWORD")),

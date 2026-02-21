@@ -27,10 +27,10 @@ log = structlog.get_logger()
 # ---------------------------------------------------------------------------
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "bodhi")
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    f"postgresql://bodhi:{POSTGRES_PASSWORD}@postgres:5432/bodhi",
+DATABASE_URL = (
+    os.getenv("POSTGRES_URL")
+    or os.getenv("DATABASE_URL")
+    or f"postgresql://bodhi:{os.getenv('POSTGRES_PASSWORD', 'bodhi')}@postgres:5432/bodhi"
 )
 EMOTION_TRANSITION_SPEED = float(os.getenv("EMOTION_TRANSITION_SPEED", "0.1"))
 DRIFT_RATE = 0.02

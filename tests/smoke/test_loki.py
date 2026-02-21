@@ -1,11 +1,12 @@
 """Smoke tests — Loki log ingestion endpoint"""
+import os
 import time
 import pytest
 
 
 @pytest.mark.smoke
 class TestLoki:
-    BASE = "http://localhost:3100"
+    BASE = os.getenv("LOKI_URL", "http://localhost:3100")
 
     def test_ready(self, http):
         # Loki's /ready returns 503 while the ingester ring initialises.

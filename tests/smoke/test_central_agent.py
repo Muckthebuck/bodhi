@@ -1,8 +1,8 @@
 """Smoke tests — Central Agent"""
+import os
 import pytest
 
-
-BASE = "http://localhost:8000"
+BASE = os.getenv("CENTRAL_AGENT_URL", "http://localhost:8000")
 
 
 @pytest.mark.smoke

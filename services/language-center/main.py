@@ -63,7 +63,7 @@ _INTENT_PATTERNS: list[tuple[str, list[re.Pattern[str]]]] = [
     (
         "system.status",
         [
-            re.compile(r"\b(how are you|how('re| are) you|status|are you ok|feeling|doing)\b", re.I),
+            re.compile(r"\b(status|are you ok|system status|what is your status)\b", re.I),
         ],
     ),
     (
@@ -100,6 +100,7 @@ _INTENT_PATTERNS: list[tuple[str, list[re.Pattern[str]]]] = [
         "chitchat",
         [
             re.compile(r"\b(hi|hello|hey|sup|what'?s up|how'?s it going|hola|howdy|greetings)\b", re.I),
+            re.compile(r"\bhow are you\b", re.I),
         ],
     ),
 ]
@@ -394,9 +395,8 @@ async def understand(req: UnderstandRequest) -> UnderstandResponse:
     start = time.perf_counter()
     language_requests_total.labels(endpoint="understand").inc()
 
-    # Lazy-load model (non-blocking)
-    await _ensure_model()
-
+    # Phase 2: regex/keyword NLU — no ML model needed.
+    # Phase 4 will call `await _ensure_model()` here for DistilBERT inference.
     intent, confidence = _classify_intent(req.text)
     entities = _extract_entities(req.text)
     sentiment_label, sentiment_score = _analyse_sentiment(req.text)

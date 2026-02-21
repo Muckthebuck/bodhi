@@ -63,7 +63,7 @@ class TestPostgres:
                 pg_conn.rollback()  # expected — FK is enforced
 
     @pytest.mark.parametrize("table,col", [
-        ("memories", "id"),
+        ("memories", "memory_id"),
         ("skills", "id"),
         ("skill_executions", "id"),
         ("tool_permissions", "id"),

@@ -27,9 +27,10 @@ load_dotenv()
 log = structlog.get_logger()
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-POSTGRES_DSN = os.getenv(
-    "POSTGRES_DSN",
-    f"postgresql://bodhi:{os.getenv('POSTGRES_PASSWORD', '')}@postgres:5432/bodhi",
+POSTGRES_DSN = (
+    os.getenv("POSTGRES_URL")
+    or os.getenv("POSTGRES_DSN")
+    or f"postgresql://bodhi:{os.getenv('POSTGRES_PASSWORD', '')}@postgres:5432/bodhi"
 )
 QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
 QDRANT_COLLECTION = "memories"
@@ -323,7 +324,7 @@ async def retrieve_memories(req: RetrieveRequest) -> list[MemoryResult]:
     try:
         vector = await _embed(req.query)
         search_filter = None
-        if req.memory_type:
+        if req.memory_type and req.memory_type != "all":
             from qdrant_client.models import Filter, FieldCondition, MatchValue
             search_filter = Filter(
                 must=[FieldCondition(key="memory_type", match=MatchValue(value=req.memory_type))]

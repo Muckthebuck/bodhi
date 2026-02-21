@@ -1,10 +1,11 @@
 """Smoke tests — Prometheus exporters (node, postgres, redis)"""
+import os
 import pytest
 
 
 @pytest.mark.smoke
 class TestNodeExporter:
-    BASE = "http://localhost:9100"
+    BASE = os.getenv("NODE_EXPORTER_URL", "http://localhost:9100")
 
     def test_metrics_endpoint(self, http):
         r = http.get(f"{self.BASE}/metrics")
@@ -27,7 +28,7 @@ class TestNodeExporter:
 class TestPrometheusTargetHealth:
     """Verify every configured scrape target is actively UP in Prometheus."""
 
-    PROMETHEUS = "http://localhost:9090"
+    PROMETHEUS = os.getenv("PROMETHEUS_URL", "http://localhost:9090")
     EXPECTED_UP = {"node", "prometheus", "redis", "postgres", "loki"}
 
     def _targets_by_job(self, http) -> dict:

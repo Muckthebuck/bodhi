@@ -12,7 +12,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from neo4j import AsyncGraphDatabase
 from prometheus_client import make_asgi_app
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 
 import metrics
@@ -22,9 +22,10 @@ load_dotenv()
 log = structlog.get_logger()
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-POSTGRES_DSN = os.getenv(
-    "POSTGRES_DSN",
-    f"postgresql://bodhi:{os.getenv('POSTGRES_PASSWORD', '')}@postgres:5432/bodhi",
+POSTGRES_DSN = (
+    os.getenv("POSTGRES_URL")
+    or os.getenv("POSTGRES_DSN")
+    or f"postgresql://bodhi:{os.getenv('POSTGRES_PASSWORD', '')}@postgres:5432/bodhi"
 )
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
@@ -42,7 +43,7 @@ _state: dict[str, Any] = {
 
 
 class InputRequest(BaseModel):
-    text: str
+    text: str = Field(min_length=1)
     session_id: str
 
 

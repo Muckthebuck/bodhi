@@ -313,7 +313,7 @@ services:
         condition: service_healthy
     healthcheck:
       <<: *healthcheck-defaults
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8003/health | grep -q healthy"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys; r=urllib.request.urlopen('http://localhost:8003/health',timeout=3); sys.exit(0 if b'healthy' in r.read() else 1)\""]
     networks:
       - bodhi-network
     logging: *default-logging
@@ -333,7 +333,7 @@ services:
         condition: service_healthy
     healthcheck:
       <<: *healthcheck-defaults
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8002/health | grep -q healthy"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys; r=urllib.request.urlopen('http://localhost:8002/health',timeout=3); sys.exit(0 if b'healthy' in r.read() else 1)\""]
       start_period: 60s
     networks:
       - bodhi-network
@@ -360,7 +360,7 @@ services:
         condition: service_healthy
     healthcheck:
       <<: *healthcheck-defaults
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8001/health | grep -q healthy"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys; r=urllib.request.urlopen('http://localhost:8001/health',timeout=3); sys.exit(0 if b'healthy' in r.read() else 1)\""]
       start_period: 60s
     networks:
       - bodhi-network
@@ -400,7 +400,7 @@ services:
         condition: service_healthy
     healthcheck:
       <<: *healthcheck-defaults
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health | grep -q healthy"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request,sys; r=urllib.request.urlopen('http://localhost:8000/health',timeout=3); sys.exit(0 if b'healthy' in r.read() else 1)\""]
       start_period: 120s
     networks:
       - bodhi-network

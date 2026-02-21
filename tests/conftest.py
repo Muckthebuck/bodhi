@@ -2,6 +2,10 @@
 Shared fixtures for Bodhi test suite.
 Loads credentials from .env (production) with fallback to .env.test
 (committed test defaults) so tests never fail due to a missing .env.
+
+Service hostnames are configurable via environment variables so the
+same test suite runs both locally (defaults → localhost) and inside
+the Docker network (set via the test-runner service in docker-compose.dev.yml).
 """
 import os
 import pytest
@@ -24,11 +28,17 @@ def _env(key: str, default: str = "") -> str:
     return os.environ.get(key, default)
 
 
+# Infra hosts — override when running inside Docker network
+_REDIS_HOST      = _env("REDIS_HOST",      "localhost")
+_POSTGRES_HOST   = _env("POSTGRES_HOST",   "localhost")
+_NEO4J_HOST      = _env("NEO4J_HOST",      "localhost")
+
+
 @pytest.fixture(scope="session")
 def pg_conn():
     import psycopg2
     conn = psycopg2.connect(
-        host="localhost",
+        host=_POSTGRES_HOST,
         port=5432,
         dbname="bodhi",
         user="bodhi",
@@ -41,7 +51,7 @@ def pg_conn():
 @pytest.fixture(scope="session")
 def redis_client():
     import redis as redis_lib
-    client = redis_lib.Redis(host="localhost", port=6379, decode_responses=True)
+    client = redis_lib.Redis(host=_REDIS_HOST, port=6379, decode_responses=True)
     yield client
     client.close()
 
@@ -50,7 +60,7 @@ def redis_client():
 def neo4j_driver():
     from neo4j import GraphDatabase
     driver = GraphDatabase.driver(
-        "bolt://localhost:7687",
+        f"bolt://{_NEO4J_HOST}:7687",
         auth=("neo4j", _env("NEO4J_PASSWORD")),
     )
     yield driver
@@ -59,10 +69,10 @@ def neo4j_driver():
 
 @pytest.fixture(scope="session")
 def http():
-    """Thin requests session with a short timeout."""
+    """Requests session. Default timeout of 15s to handle NLU warm-up on first call."""
     s = requests.Session()
     s.request = lambda method, url, **kw: requests.Session.request(
-        s, method, url, timeout=kw.pop("timeout", 5), **kw
+        s, method, url, timeout=kw.pop("timeout", 15), **kw
     )
     yield s
     s.close()

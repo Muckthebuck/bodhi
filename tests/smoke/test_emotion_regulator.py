@@ -1,7 +1,8 @@
 """Smoke tests — Emotion Regulator"""
+import os
 import pytest
 
-BASE = "http://localhost:8003"
+BASE = os.getenv("EMOTION_REGULATOR_URL", "http://localhost:8003")
 
 PERSONALITY = {
     "openness": 0.8,
@@ -24,7 +25,7 @@ class TestEmotionRegulatorHealth:
     def test_metrics_endpoint(self, http):
         r = http.get(f"{BASE}/metrics")
         assert r.status_code == 200
-        assert "bodhi_emotion_events_total" in r.text
+        assert "bodhi_emotion_updates_total" in r.text
 
 
 @pytest.mark.smoke

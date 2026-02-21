@@ -10,23 +10,26 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- ── Memory System ────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS memories (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    content     TEXT NOT NULL,
-    summary     TEXT,
-    embedding   BYTEA,                          -- fallback if qdrant unavailable
-    importance  FLOAT NOT NULL DEFAULT 0.5,
-    tier        VARCHAR(20) NOT NULL DEFAULT 'medium_term',
-    source      VARCHAR(50),                    -- 'conversation', 'observation', 'skill_execution'
-    emotion     JSONB,                          -- {valence, arousal} at time of creation
-    tags        TEXT[],
+    memory_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    content      TEXT NOT NULL,
+    summary      TEXT,
+    embedding    BYTEA,                          -- fallback if qdrant unavailable
+    importance   FLOAT NOT NULL DEFAULT 0.5,
+    memory_type  VARCHAR(20) NOT NULL DEFAULT 'episodic', -- episodic | semantic | working
+    session_id   VARCHAR(100) NOT NULL DEFAULT '',
+    source       VARCHAR(50),                    -- 'conversation', 'observation', 'skill_execution'
+    emotion      JSONB,                          -- {valence, arousal} at time of creation
+    metadata     JSONB NOT NULL DEFAULT '{}',
+    tags         TEXT[],
     access_count INTEGER NOT NULL DEFAULT 0,
-    last_accessed_at TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    expires_at  TIMESTAMPTZ                     -- NULL = permanent
+    last_accessed TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at   TIMESTAMPTZ                     -- NULL = permanent
 );
 
 CREATE INDEX IF NOT EXISTS idx_memories_importance ON memories(importance DESC);
-CREATE INDEX IF NOT EXISTS idx_memories_tier ON memories(tier);
+CREATE INDEX IF NOT EXISTS idx_memories_type ON memories(memory_type);
+CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id);
 CREATE INDEX IF NOT EXISTS idx_memories_created ON memories(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memories_tags ON memories USING GIN(tags);
 

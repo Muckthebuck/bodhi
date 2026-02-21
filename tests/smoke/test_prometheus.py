@@ -1,10 +1,11 @@
 """Smoke tests — Prometheus health and scrape config"""
+import os
 import pytest
 
 
 @pytest.mark.smoke
 class TestPrometheus:
-    BASE = "http://localhost:9090"
+    BASE = os.getenv("PROMETHEUS_URL", "http://localhost:9090")
     EXPECTED_JOBS = {"node", "prometheus", "redis", "postgres", "loki"}
 
     def test_healthy(self, http):

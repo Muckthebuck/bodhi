@@ -1,8 +1,8 @@
 """Smoke tests — Language Center"""
+import os
 import pytest
 
-
-BASE = "http://localhost:8002"
+BASE = os.getenv("LANGUAGE_CENTER_URL", "http://localhost:8002")
 
 
 @pytest.mark.smoke

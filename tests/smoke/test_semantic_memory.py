@@ -5,11 +5,12 @@ Tests that the sentence-transformer embedding + Qdrant retrieval pipeline
 actually understands meaning: paraphrased queries should still find the
 right memories, and more relevant results should rank above irrelevant ones.
 """
+import os
 import pytest
 import time
 
 
-BASE = "http://localhost:8001"
+BASE = os.getenv("MEMORY_MANAGER_URL", "http://localhost:8001")
 SESSION = "smoke-semantic"
 
 
@@ -74,7 +75,7 @@ class TestSemanticRetrieval:
             "memory_type": "all",
         }, timeout=30)
         assert r.status_code == 200
-        memories = r.json()["memories"]
+        memories = r.json()
         assert len(memories) > 0
         top_content = memories[0]["content"].lower()
         assert "dark" in top_content or "mode" in top_content or "prefer" in top_content
@@ -87,7 +88,7 @@ class TestSemanticRetrieval:
             "memory_type": "all",
         }, timeout=30)
         assert r.status_code == 200
-        memories = r.json()["memories"]
+        memories = r.json()
         assert len(memories) > 0
         contents = " ".join(m["content"].lower() for m in memories[:2])
         assert "python" in contents or "programming" in contents or "language" in contents
@@ -100,7 +101,7 @@ class TestSemanticRetrieval:
             "memory_type": "all",
         }, timeout=30)
         assert r.status_code == 200
-        memories = r.json()["memories"]
+        memories = r.json()
         assert len(memories) > 0
         contents = " ".join(m["content"].lower() for m in memories[:2])
         assert "gym" in contents or "monday" in contents or "thursday" in contents
@@ -113,7 +114,7 @@ class TestSemanticRetrieval:
             "memory_type": "all",
         }, timeout=30)
         assert r.status_code == 200
-        memories = r.json()["memories"]
+        memories = r.json()
         assert len(memories) > 0
         contents = " ".join(m["content"].lower() for m in memories[:2])
         assert "cat" in contents or "miso" in contents or "pet" in contents
@@ -131,7 +132,7 @@ class TestSemanticRanking:
             "memory_type": "all",
         }, timeout=30)
         assert r.status_code == 200
-        memories = r.json()["memories"]
+        memories = r.json()
         assert len(memories) >= 2
 
         # Dark mode should rank above gym schedule for a UI query
@@ -153,7 +154,7 @@ class TestSemanticRanking:
             "memory_type": "all",
         }, timeout=30)
         assert r.status_code == 200
-        memories = r.json()["memories"]
+        memories = r.json()
         if len(memories) >= 2:
             scores = [m.get("similarity", 1.0) for m in memories]
             for i in range(len(scores) - 1):
@@ -168,7 +169,7 @@ class TestSemanticRanking:
             "memory_type": "all",
         }, timeout=30)
         assert r.status_code == 200
-        memories = r.json()["memories"]
+        memories = r.json()
         # All results should have low similarity for a completely unrelated query
         for m in memories:
             score = m.get("similarity", 0.0)
@@ -186,7 +187,7 @@ class TestSemanticMinScoreFiltering:
             "memory_type": "all",
         }, timeout=30)
         assert r.status_code == 200
-        memories = r.json()["memories"]
+        memories = r.json()
         # Nothing in our seed set should be highly similar to quantum physics
         for m in memories:
             assert m.get("similarity", 0.0) >= 0.8
@@ -199,4 +200,4 @@ class TestSemanticMinScoreFiltering:
             "memory_type": "all",
         }, timeout=30)
         assert r.status_code == 200
-        assert len(r.json()["memories"]) > 0
+        assert len(r.json()) > 0

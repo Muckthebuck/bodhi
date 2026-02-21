@@ -1,11 +1,11 @@
 """Smoke tests — Grafana health and provisioning"""
-import pytest
 import os
+import pytest
 
 
 @pytest.mark.smoke
 class TestGrafana:
-    BASE = "http://localhost:3000"
+    BASE = os.getenv("GRAFANA_URL", "http://localhost:3000")
 
     @pytest.fixture(scope="class")
     def auth(self):

@@ -1,6 +1,6 @@
-# बोधि (Bodhi)
+# Bodhi
 
-> *Sanskrit: बोधि — "awakening" or "enlightenment"*
+> *Sanskrit: "awakening" or "enlightenment"*
 
 A brain-inspired, privacy-first AI companion designed to run locally on edge devices (Raspberry Pi 5 and beyond). Bodhi learns, remembers, and grows with you — entirely on your hardware, entirely under your control.
 

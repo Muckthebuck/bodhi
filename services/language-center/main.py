@@ -42,6 +42,16 @@ REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379")
 SERVICE_VERSION = "0.1.0"
 
 # ---------------------------------------------------------------------------
+# Live emotion cache — updated by emotion.state_changed pub/sub events
+# ---------------------------------------------------------------------------
+_emotion_cache: dict[str, Any] = {
+    "valence": 0.0,
+    "arousal": 0.0,
+    "dominance": 0.0,
+    "label": "neutral",
+}
+
+# ---------------------------------------------------------------------------
 # Module-level model cache (lazy-loaded on first NLU request)
 # ---------------------------------------------------------------------------
 _model: Any = None
@@ -243,6 +253,7 @@ def _generate_response(
     intent: str,
     emotion: dict[str, Any],
     personality: dict[str, float],
+    memory_context: list[str] | None = None,
 ) -> str:
     valence: float = emotion.get("valence", 0.0)
     emotion_adj = valence_to_adjective(valence)
@@ -256,6 +267,11 @@ def _generate_response(
     tone = _personality_tone(personality)
     template = _select_template(intent, personality)
     text = _render_template(template, topic=topic, emotion_adj=emotion_adj)
+
+    # Prepend a brief memory recall note when relevant past context exists
+    if memory_context:
+        recall = memory_context[0][:80].rstrip()
+        text = f"[Remembering: \"{recall}\"...] {text}"
 
     # Cautious suffix for high neuroticism
     if tone["caution"]:
@@ -317,28 +333,54 @@ class SentimentResponse(BaseModel):
 
 async def _redis_subscriber(redis_client: aioredis.Redis) -> None:
     pubsub = redis_client.pubsub()
-    await pubsub.subscribe("user.input")
-    log.info("redis_subscribed", channel="user.input")
+    await pubsub.subscribe("user.input", "emotion.state_changed")
+    log.info("redis_subscribed", channels=["user.input", "emotion.state_changed"])
     async for message in pubsub.listen():
         if message["type"] != "message":
             continue
         try:
+            channel: str = message["channel"]
+
+            # ----------------------------------------------------------------
+            # Keep emotion cache up to date
+            # ----------------------------------------------------------------
+            if channel == "emotion.state_changed":
+                state = json.loads(message["data"])
+                _emotion_cache.update({
+                    "valence": state.get("valence", 0.0),
+                    "arousal": state.get("arousal", 0.0),
+                    "dominance": state.get("dominance", 0.0),
+                    "label": state.get("label", "neutral"),
+                })
+                log.debug("emotion_cache_updated", label=_emotion_cache["label"])
+                continue
+
+            # ----------------------------------------------------------------
+            # user.input — classify intent + generate response
+            # ----------------------------------------------------------------
             payload: dict[str, Any] = json.loads(message["data"])
             text: str = payload.get("text", "")
             request_id: str = payload.get("request_id", "unknown")
             session_id: str = payload.get("session_id", "")
+            memory_context: list[str] = payload.get("memory_context", [])
 
             intent, confidence = _classify_intent(text)
             entities = _extract_entities(text)
             sentiment_label, sentiment_score = _analyse_sentiment(text)
 
-            # Use neutral defaults; Phase 3 will inject live emotion/personality context
-            _default_emotion = {"valence": 0.0, "arousal": 0.0, "label": sentiment_label}
+            # Use live emotion state; fallback to neutral defaults if empty
+            live_emotion = {
+                "valence": _emotion_cache.get("valence", 0.0),
+                "arousal": _emotion_cache.get("arousal", 0.0),
+                "label": _emotion_cache.get("label", sentiment_label),
+            }
             _default_personality = {
                 "extraversion": 0.5, "agreeableness": 0.8,
                 "neuroticism": 0.2, "openness": 0.7, "conscientiousness": 0.6,
             }
-            response_text = _generate_response(text, intent, _default_emotion, _default_personality)
+            response_text = _generate_response(
+                text, intent, live_emotion, _default_personality, memory_context
+            )
 
             result = {
                 "request_id": request_id,
@@ -350,9 +392,9 @@ async def _redis_subscriber(redis_client: aioredis.Redis) -> None:
                 "sentiment": sentiment_label,
                 "sentiment_score": sentiment_score,
             }
-            channel = f"language.response.{request_id}"
-            await redis_client.publish(channel, json.dumps(result))
-            log.info("published_response", channel=channel, intent=intent)
+            result_channel = f"language.response.{request_id}"
+            await redis_client.publish(result_channel, json.dumps(result))
+            log.info("published_response", channel=result_channel, intent=intent)
         except Exception as exc:
             log.error("redis_message_error", error=str(exc))
 

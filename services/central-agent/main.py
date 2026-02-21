@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import asyncpg
+import httpx
 import structlog
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -30,8 +31,10 @@ POSTGRES_DSN = (
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
+MEMORY_MANAGER_URL = os.getenv("MEMORY_MANAGER_URL", "http://memory-manager:8002")
 
 RESPONSE_TIMEOUT = 5.0
+MEMORY_RETRIEVE_TIMEOUT = 1.0   # fail fast — never block user response
 
 _state: dict[str, Any] = {
     "redis": None,
@@ -40,6 +43,7 @@ _state: dict[str, Any] = {
     "active_agents": set(),
     "agent_last_seen": {},   # {agent_name: float timestamp}
     "pending_responses": {},
+    "http_client": None,
 }
 
 
@@ -54,7 +58,28 @@ class InputResponse(BaseModel):
     error: str | None = None
 
 
-async def _redis_subscriber() -> None:
+async def _fetch_memory_context(text: str, session_id: str) -> list[str]:
+    """Retrieve top-3 relevant memories for *text*. Returns [] on any failure."""
+    client: httpx.AsyncClient | None = _state.get("http_client")
+    if client is None:
+        return []
+    try:
+        resp = await asyncio.wait_for(
+            client.post(
+                f"{MEMORY_MANAGER_URL}/retrieve",
+                json={"query": text, "limit": 3, "min_score": 0.4},
+            ),
+            timeout=MEMORY_RETRIEVE_TIMEOUT,
+        )
+        if resp.status_code == 200:
+            hits = resp.json()
+            return [h["content"] for h in hits if h.get("content")]
+    except Exception as exc:
+        log.warning("memory_retrieve_failed", error=str(exc))
+    return []
+
+
+
     redis: Redis = _state["redis"]
     pubsub = redis.pubsub()
     # psubscribe for dynamic per-request response channels; plain subscribe for events
@@ -123,6 +148,8 @@ async def _heartbeat_watcher() -> None:
 async def lifespan(app: FastAPI):
     log.info("central_agent_starting")
 
+    _state["http_client"] = httpx.AsyncClient(timeout=httpx.Timeout(2.0))
+
     try:
         _state["redis"] = Redis.from_url(REDIS_URL, decode_responses=True)
         await _state["redis"].ping()
@@ -161,6 +188,8 @@ async def lifespan(app: FastAPI):
         task.cancel()
     await asyncio.gather(*background_tasks, return_exceptions=True)
 
+    if _state["http_client"]:
+        await _state["http_client"].aclose()
     if _state["redis"]:
         await _state["redis"].aclose()
     if _state["pg_pool"]:
@@ -218,7 +247,15 @@ async def handle_input(body: InputRequest, request: Request) -> InputResponse:
     future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
     _state["pending_responses"][request_id] = future
 
-    payload = json.dumps({"request_id": request_id, "session_id": body.session_id, "text": body.text})
+    # Retrieve relevant memories before dispatching (best-effort; never blocks user)
+    memory_context = await _fetch_memory_context(body.text, body.session_id)
+
+    payload = json.dumps({
+        "request_id": request_id,
+        "session_id": body.session_id,
+        "text": body.text,
+        "memory_context": memory_context,
+    })
     try:
         try:
             await asyncio.wait_for(

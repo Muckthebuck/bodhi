@@ -397,7 +397,7 @@ async def retrieve_memories(req: RetrieveRequest) -> list[MemoryResult]:
             time.perf_counter() - t0
         )
 
-        return [
+        results = [
             MemoryResult(
                 id=str(hit.id),
                 content=hit.payload.get("content", ""),
@@ -408,6 +408,26 @@ async def retrieve_memories(req: RetrieveRequest) -> list[MemoryResult]:
             )
             for hit in hits
         ]
+
+        # Increment access_count for returned memories (best-effort)
+        if results and _pg_pool:
+            hit_ids = [r.id for r in results]
+            try:
+                async with asyncio.timeout(2.0):
+                    async with _pg_pool.acquire() as conn:
+                        await conn.execute(
+                            """
+                            UPDATE memories
+                               SET access_count = access_count + 1,
+                                   last_accessed = NOW()
+                             WHERE memory_id = ANY($1::uuid[])
+                            """,
+                            hit_ids,
+                        )
+            except Exception as exc:
+                log.warning("access_count_update_failed", error=str(exc))
+
+        return results
     except Exception as exc:
         log.error("retrieve_failed", error=str(exc))
         raise HTTPException(status_code=500, detail=str(exc))

@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!tests/files/.env.test
 
 # Secrets & Certificates
 certs/
@@ -32,6 +33,7 @@ yarn-error.log*
 # Go
 *.exe
 *.test
+!tests/files/*.test
 vendor/
 
 # Docker

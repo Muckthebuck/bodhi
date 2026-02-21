@@ -1,6 +1,7 @@
 """
 Shared fixtures for Bodhi test suite.
-Loads .env from project root so tests can run against a live stack.
+Loads credentials from .env (production) with fallback to .env.test
+(committed test defaults) so tests never fail due to a missing .env.
 """
 import os
 import pytest
@@ -8,9 +9,13 @@ import requests
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load .env from project root (one level up from tests/)
 _ROOT = Path(__file__).parent.parent
-load_dotenv(_ROOT / ".env")
+
+# .env takes precedence; fall back to committed .env.test
+if (_ROOT / ".env").exists():
+    load_dotenv(_ROOT / ".env")
+else:
+    load_dotenv(_ROOT / "tests" / "files" / ".env.test")
 
 
 # ── Connection details from env ───────────────────────────────────────────────

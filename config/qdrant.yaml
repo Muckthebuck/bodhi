@@ -1,0 +1,14 @@
+storage:
+  storage_path: /qdrant/storage
+
+service:
+  grpc_port: 6334
+  max_request_size_mb: 32
+
+# Collection defaults
+collection:
+  vectors:
+    on_disk: false
+  optimizers:
+    default_segment_number: 2
+  replication_factor: 1

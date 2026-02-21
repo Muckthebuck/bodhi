@@ -251,6 +251,7 @@ services:
       - ./monitoring/promtail.yml:/etc/promtail/config.yml:ro
       - /var/log:/var/log:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - promtail-data:/var/lib/promtail
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       loki:
@@ -285,3 +286,4 @@ volumes:
   prometheus-data:
   grafana-data:
   loki-data:
+  promtail-data:

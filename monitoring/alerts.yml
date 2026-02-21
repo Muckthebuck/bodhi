@@ -2,7 +2,7 @@ groups:
   - name: bodhi
     rules:
       - alert: ServiceDown
-        expr: up == 0
+        expr: up{job=~"node|prometheus|redis|postgres|loki"} == 0
         for: 1m
         labels:
           severity: critical

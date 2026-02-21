@@ -243,7 +243,7 @@ class TestFetchMemoryContext:
         finally:
             _ca._state["http_client"] = original
 
-
+    async def test_memory_context_injected_into_redis_payload(self):
         """The payload published to user.input must include memory_context key."""
         import json
 

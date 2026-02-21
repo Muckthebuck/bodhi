@@ -3,6 +3,10 @@
 -- Runs once on first container start.
 -- ============================================================
 
+-- gen_random_uuid() is built-in from PG 13+; pgcrypto provides it
+-- on older versions and is a no-op on 13+.
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 -- ── Memory System ────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS memories (

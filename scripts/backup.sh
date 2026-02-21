@@ -54,13 +54,15 @@ ok "Neo4j"
 
 # Qdrant (copy storage directory)
 echo "  Backing up Qdrant..."
-docker cp bodhi-qdrant:/qdrant/storage "$BACKUP_DIR/qdrant-storage"
+_qdrant_cid=$(docker compose ps -q qdrant | head -1)
+docker cp "${_qdrant_cid}:/qdrant/storage" "$BACKUP_DIR/qdrant-storage"
 ok "Qdrant"
 
 # Redis snapshot
 echo "  Backing up Redis..."
 docker compose exec -T redis redis-cli SAVE > /dev/null
-docker cp bodhi-redis:/data/dump.rdb "$BACKUP_DIR/redis.rdb"
+_redis_cid=$(docker compose ps -q redis | head -1)
+docker cp "${_redis_cid}:/data/dump.rdb" "$BACKUP_DIR/redis.rdb"
 ok "Redis"
 
 # Config

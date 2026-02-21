@@ -8,10 +8,37 @@ set -euo pipefail
 BACKUP_DIR="./backups/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$BACKUP_DIR"
 
-GREEN='\033[0;32m'; NC='\033[0m'
-ok() { echo -e "${GREEN}✓${NC} $1"; }
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+ok()    { echo -e "${GREEN}✓${NC} $1"; }
+warn()  { echo -e "${YELLOW}⚠${NC}  $1"; }
+error() { echo -e "${RED}✗${NC} $1" >&2; }
+
+# ── Pre-flight: verify each service is running and healthy ────
+_require_healthy() {
+  local svc=$1
+  local cid
+  cid=$(docker compose ps -q "$svc" 2>/dev/null | head -1)
+  if [ -z "$cid" ]; then
+    error "Service '$svc' is not running — aborting backup"
+    rm -rf "$BACKUP_DIR"
+    exit 1
+  fi
+  local health
+  health=$(docker inspect --format '{{.State.Health.Status}}' "$cid" 2>/dev/null)
+  if [ "$health" = "unhealthy" ]; then
+    error "Service '$svc' is unhealthy — aborting backup"
+    rm -rf "$BACKUP_DIR"
+    exit 1
+  fi
+}
 
 echo "📦 Creating backup → $BACKUP_DIR"
+echo "  Checking service health..."
+_require_healthy postgres
+_require_healthy neo4j
+_require_healthy qdrant
+_require_healthy redis
+ok "All services healthy"
 
 # PostgreSQL
 echo "  Backing up PostgreSQL..."

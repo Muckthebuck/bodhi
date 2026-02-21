@@ -102,7 +102,7 @@ services:
           cpus: '1.0'
 
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.17.0
     container_name: bodhi-qdrant
     restart: unless-stopped
     ports:
@@ -128,7 +128,7 @@ services:
   # ──────────────────────────────────────────────
 
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.9.1
     container_name: bodhi-node-exporter
     restart: unless-stopped
     ports:
@@ -152,7 +152,7 @@ services:
           cpus: '0.1'
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.9.1
     container_name: bodhi-prometheus
     restart: unless-stopped
     ports:
@@ -179,7 +179,7 @@ services:
           cpus: '0.5'
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.3.3
     container_name: bodhi-grafana
     restart: unless-stopped
     ports:
@@ -211,7 +211,7 @@ services:
           cpus: '0.5'
 
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.6.6
     container_name: bodhi-loki
     restart: unless-stopped
     ports:
@@ -236,7 +236,7 @@ services:
           cpus: '0.5'
 
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.6.6
     container_name: bodhi-promtail
     restart: unless-stopped
     volumes:

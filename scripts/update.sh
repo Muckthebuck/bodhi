@@ -11,11 +11,14 @@ warn() { echo -e "${YELLOW}⚠${NC}  $1"; }
 
 echo "🔄 Updating Bodhi..."
 
+# Capture pre-pull revision so we can diff all changes, not just HEAD~1
+PRE_PULL=$(git rev-parse HEAD)
+
 # Pull latest code
 git pull origin main
 ok "Code updated"
 
-# Pull latest base images
+# Pull latest pinned images
 docker compose pull --quiet
 ok "Images pulled"
 
@@ -26,16 +29,19 @@ if [ -f "infra/migrate.sh" ]; then
   ok "Migrations complete"
 fi
 
+# Diff everything changed since before the pull
+CHANGED=$(git diff --name-only "${PRE_PULL}"..HEAD)
+
 # Restart infrastructure only if compose config changed
-if git diff HEAD~1 --name-only | grep -q "docker-compose"; then
+if echo "$CHANGED" | grep -q "docker-compose"; then
   warn "docker-compose.yml changed — restarting infrastructure"
   docker compose up -d redis postgres neo4j qdrant
 fi
 
 # Restart monitoring only if config changed
-if git diff HEAD~1 --name-only | grep -q "monitoring/"; then
+if echo "$CHANGED" | grep -q "monitoring/"; then
   warn "Monitoring config changed — restarting stack"
-  docker compose up -d prometheus grafana loki promtail
+  docker compose up -d node-exporter prometheus grafana loki promtail
 fi
 
 # Restart application services (rolling, when they exist)

@@ -146,6 +146,11 @@ while true; do
 done
 ok "Databases healthy"
 
+# ── Run one-shot Neo4j init (constraints + seed data) ────────
+info "Running Neo4j initialisation..."
+docker compose up --no-deps neo4j-init
+ok "Neo4j initialised"
+
 # ── Start monitoring ─────────────────────────────────────────
 info "Starting monitoring stack..."
 docker compose up -d prometheus grafana loki promtail

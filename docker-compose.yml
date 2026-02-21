@@ -40,11 +40,8 @@ services:
     networks:
       - bodhi-network
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
+    mem_limit: 256m
+    cpus: 0.5
 
   postgres:
     image: postgres:15-alpine
@@ -65,11 +62,8 @@ services:
     networks:
       - bodhi-network
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '1.0'
+    mem_limit: 512m
+    cpus: 1.0
 
   neo4j:
     image: neo4j:5-community
@@ -95,11 +89,8 @@ services:
     networks:
       - bodhi-network
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '1.0'
+    mem_limit: 1g
+    cpus: 1.0
 
   qdrant:
     image: qdrant/qdrant:v1.17.0
@@ -117,11 +108,8 @@ services:
     networks:
       - bodhi-network
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '1.0'
+    mem_limit: 512m
+    cpus: 1.0
 
   # ──────────────────────────────────────────────
   # Monitoring
@@ -145,11 +133,8 @@ services:
     networks:
       - bodhi-network
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 32M
-          cpus: '0.1'
+    mem_limit: 32m
+    cpus: 0.1
 
   prometheus:
     image: prom/prometheus:v3.9.1
@@ -172,11 +157,8 @@ services:
     networks:
       - bodhi-network
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
+    mem_limit: 256m
+    cpus: 0.5
 
   grafana:
     image: grafana/grafana:12.3.3
@@ -204,11 +186,8 @@ services:
     networks:
       - bodhi-network
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-          cpus: '0.5'
+    mem_limit: 128m
+    cpus: 0.5
 
   loki:
     image: grafana/loki:3.6.6
@@ -229,11 +208,8 @@ services:
     networks:
       - bodhi-network
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.5'
+    mem_limit: 256m
+    cpus: 0.5
 
   promtail:
     image: grafana/promtail:3.6.6
@@ -250,11 +226,8 @@ services:
     networks:
       - bodhi-network
     logging: *default-logging
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-          cpus: '0.25'
+    mem_limit: 64m
+    cpus: 0.25
 
 # ──────────────────────────────────────────────
 # Networks

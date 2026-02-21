@@ -31,7 +31,7 @@ POSTGRES_DSN = (
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
-MEMORY_MANAGER_URL = os.getenv("MEMORY_MANAGER_URL", "http://memory-manager:8002")
+MEMORY_MANAGER_URL = os.getenv("MEMORY_MANAGER_URL", "http://memory-manager:8001")
 
 RESPONSE_TIMEOUT = 5.0
 MEMORY_RETRIEVE_TIMEOUT = 1.0   # fail fast — never block user response
@@ -67,7 +67,7 @@ async def _fetch_memory_context(text: str, session_id: str) -> list[str]:
         resp = await asyncio.wait_for(
             client.post(
                 f"{MEMORY_MANAGER_URL}/retrieve",
-                json={"query": text, "limit": 3, "min_score": 0.4},
+                json={"query": text, "limit": 3, "min_score": 0.4, "session_id": session_id},
             ),
             timeout=MEMORY_RETRIEVE_TIMEOUT,
         )
@@ -79,7 +79,7 @@ async def _fetch_memory_context(text: str, session_id: str) -> list[str]:
     return []
 
 
-
+async def _redis_subscriber() -> None:
     redis: Redis = _state["redis"]
     pubsub = redis.pubsub()
     # psubscribe for dynamic per-request response channels; plain subscribe for events
@@ -156,6 +156,9 @@ async def lifespan(app: FastAPI):
         log.info("redis_connected", url=REDIS_URL)
     except Exception as exc:
         log.error("redis_connect_failed", error=str(exc))
+        if _state.get("redis"):
+            await _state["redis"].aclose()
+        _state["redis"] = None
 
     try:
         _state["pg_pool"] = await asyncpg.create_pool(dsn=POSTGRES_DSN, min_size=2, max_size=10)
@@ -174,6 +177,12 @@ async def lifespan(app: FastAPI):
         log.info("neo4j_connected", uri=NEO4J_URI)
     except Exception as exc:
         log.error("neo4j_connect_failed", error=str(exc))
+        if _state.get("neo4j_driver"):
+            try:
+                await _state["neo4j_driver"].close()
+            except Exception as close_exc:
+                log.warning("neo4j_driver_close_failed", error=str(close_exc))
+        _state["neo4j_driver"] = None
 
     background_tasks = []
     if _state["redis"]:

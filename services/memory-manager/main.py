@@ -256,7 +256,28 @@ async def _store_semantic(
         )
     except Exception as exc:
         log.warning("qdrant_store_failed_fallback_postgres", error=str(exc))
-        return await _store_episodic(content, session_id, importance, metadata)
+        # Fall back to Postgres with memory_type='semantic' so the API response
+        # and DB stay consistent (Qdrant is the source of truth for vectors, but
+        # Postgres holds the record until Qdrant is available again).
+        async with asyncio.timeout(5.0):
+            async with _pg_pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    """
+                    INSERT INTO memories (session_id, content, memory_type, importance, metadata)
+                    VALUES ($1, $2, 'semantic', $3, $4)
+                    RETURNING memory_id
+                    """,
+                    session_id,
+                    content,
+                    importance,
+                    json.dumps(metadata),
+                )
+        memory_id = str(row["memory_id"])
+        await _redis.publish(
+            "memory.stored",
+            json.dumps({"memory_id": memory_id, "memory_type": "semantic"}),
+        )
+        return memory_id
     return point_id
 
 
@@ -310,12 +331,13 @@ class RetrieveRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=100)
     min_score: float = Field(default=0.0, ge=0.0, le=1.0)
     memory_type: str | None = None
+    session_id: str = ""
 
 
 class MemoryResult(BaseModel):
     id: str
     content: str
-    score: float
+    similarity: float
     session_id: str
     importance: float
     metadata: dict[str, Any]
@@ -378,11 +400,16 @@ async def retrieve_memories(req: RetrieveRequest) -> list[MemoryResult]:
     try:
         vector = await _embed(req.query)
         search_filter = None
+        must_conditions = []
         if req.memory_type and req.memory_type != "all":
             from qdrant_client.models import Filter, FieldCondition, MatchValue
-            search_filter = Filter(
-                must=[FieldCondition(key="memory_type", match=MatchValue(value=req.memory_type))]
-            )
+            must_conditions.append(FieldCondition(key="memory_type", match=MatchValue(value=req.memory_type)))
+        if req.session_id:
+            from qdrant_client.models import Filter, FieldCondition, MatchValue
+            must_conditions.append(FieldCondition(key="session_id", match=MatchValue(value=req.session_id)))
+        if must_conditions:
+            from qdrant_client.models import Filter
+            search_filter = Filter(must=must_conditions)
 
         hits = await _qdrant.search(
             collection_name=QDRANT_COLLECTION,
@@ -401,7 +428,7 @@ async def retrieve_memories(req: RetrieveRequest) -> list[MemoryResult]:
             MemoryResult(
                 id=str(hit.id),
                 content=hit.payload.get("content", ""),
-                score=hit.score,
+                similarity=hit.score,
                 session_id=hit.payload.get("session_id", ""),
                 importance=hit.payload.get("importance", 0.5),
                 metadata=hit.payload.get("metadata", {}),

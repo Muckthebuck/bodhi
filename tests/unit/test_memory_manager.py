@@ -104,21 +104,21 @@ class TestMemoryResultModel:
         result = MemoryResult(
             id="uuid-123",
             content="test content",
-            score=0.85,
+            similarity=0.85,
             session_id="abc",
             importance=0.6,
             metadata={"memory_type": "episodic"},
         )
         assert result.id == "uuid-123"
-        assert result.score == 0.85
+        assert result.similarity == 0.85
 
-    def test_score_is_float(self):
+    def test_similarity_is_float(self):
         result = MemoryResult(
             id="uuid-456",
             content="test",
-            score=0.5,
+            similarity=0.5,
             session_id="abc",
             importance=0.5,
             metadata={},
         )
-        assert isinstance(result.score, float)
+        assert isinstance(result.similarity, float)

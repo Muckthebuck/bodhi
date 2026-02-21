@@ -225,7 +225,25 @@ class TestFetchMemoryContext:
         finally:
             _ca._state["http_client"] = original
 
-    async def test_memory_context_injected_into_redis_payload(self):
+    async def test_session_id_forwarded_to_retrieve(self):
+        """session_id must be included in the /retrieve request body."""
+        mock_client = AsyncMock()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []
+        mock_client.post.return_value = mock_response
+
+        original = _ca._state.get("http_client")
+        _ca._state["http_client"] = mock_client
+        try:
+            await _ca._fetch_memory_context("hello", "my-session-42")
+            call_kwargs = mock_client.post.call_args
+            body = call_kwargs.kwargs.get("json") or call_kwargs.args[1] if len(call_kwargs.args) > 1 else call_kwargs.kwargs["json"]
+            assert body.get("session_id") == "my-session-42"
+        finally:
+            _ca._state["http_client"] = original
+
+
         """The payload published to user.input must include memory_context key."""
         import json
 

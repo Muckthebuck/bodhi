@@ -11,6 +11,14 @@ warn() { echo -e "${YELLOW}⚠${NC}  $1"; }
 
 echo "🔄 Updating Bodhi..."
 
+# Abort if there are uncommitted local changes — a pull could cause
+# merge conflicts or silently overwrite work in progress.
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo -e "${YELLOW}⚠${NC}  Uncommitted changes detected. Stash or commit them before updating." >&2
+  git status --short >&2
+  exit 1
+fi
+
 # Capture pre-pull revision so we can diff all changes, not just HEAD~1
 PRE_PULL=$(git rev-parse HEAD)
 

@@ -153,7 +153,7 @@ ok "Neo4j initialised"
 
 # ── Start monitoring ─────────────────────────────────────────
 info "Starting monitoring stack..."
-docker compose up -d prometheus grafana loki promtail
+docker compose up -d node-exporter postgres-exporter redis-exporter prometheus grafana loki promtail
 ok "Monitoring started"
 
 # ── Done ─────────────────────────────────────────────────────

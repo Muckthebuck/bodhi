@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChatView } from "./components/ChatView";
 import { ConnectionSetup } from "./components/ConnectionSetup";
+import { SpriteCharacter } from "./components/SpriteCharacter";
 import { StatusBar } from "./components/StatusBar";
 import { useBodhi } from "./hooks/useBodhi";
 import type { AnimationAction, ChatMessage, EmotionState, WsIncoming } from "./types";
@@ -103,12 +104,28 @@ export default function App() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <StatusBar emotion={emotion} status={status} />
-      <ChatView
-        messages={messages}
-        onSend={handleSend}
-        isConnected={status === "connected"}
-        isThinking={animation === "thinking"}
-      />
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        <div style={{ flex: 1 }}>
+          <ChatView
+            messages={messages}
+            onSend={handleSend}
+            isConnected={status === "connected"}
+            isThinking={animation === "thinking"}
+          />
+        </div>
+        <div
+          style={{
+            width: 160,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderLeft: "1px solid var(--border)",
+            background: "var(--bg-secondary)",
+          }}
+        >
+          <SpriteCharacter emotion={emotion} action={animation} size={128} />
+        </div>
+      </div>
     </div>
   );
 }

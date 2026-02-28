@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect width="128" height="128" fill="none" rx="8"/>
+  <!-- Body -->
+  <ellipse cx="64" cy="100" rx="28" ry="18" fill="#53a8b6" opacity="0.8"/>
+  <!-- Head -->
+  <circle cx="64" cy="52" r="32" fill="#53a8b6"/>
+  <!-- Eyes -->
+  <circle cx="52" cy="47" r="6" fill="#1a1a2e"/><circle cx="76" cy="47" r="6" fill="#1a1a2e"/><circle cx="54" cy="45" r="2" fill="white"/><circle cx="78" cy="45" r="2" fill="white"/>
+  <!-- Mouth -->
+  <ellipse cx="64" cy="65" rx="8" ry="6" fill="#1a1a2e"/>
+  
+</svg>

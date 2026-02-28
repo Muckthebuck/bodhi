@@ -5,8 +5,20 @@ import { ConnectionSetup } from "./components/ConnectionSetup";
 import { SessionPanel } from "./components/SessionPanel";
 import { SettingsPanel, loadSettings, type AppSettings } from "./components/SettingsPanel";
 import { SkeletalCharacter } from "./components/SkeletalCharacter";
-import { SpriteCharacter } from "./components/SpriteCharacter";
 import { StatusBar } from "./components/StatusBar";
+import { Onboarding } from "./components/Onboarding";
+import { CharacterCreator } from "./components/CharacterCreator";
+import { DynamicCharacter } from "./character/DynamicCharacter";
+import {
+  isOnboarded,
+  setOnboarded,
+  loadCharacters,
+  saveCharacters,
+  setActiveCharacterId,
+  createDefaultCharacter,
+  getActiveCharacterId as loadActiveCharId,
+  type CharacterConfig,
+} from "./character/types";
 import { useBodhi } from "./hooks/useBodhi";
 import type { AnimationAction, ChatMessage, EmotionState, WsIncoming } from "./types";
 
@@ -31,6 +43,18 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Character customization state
+  const [onboarded, setOnboardedState] = useState(isOnboarded());
+  const [characters, setCharacters] = useState<CharacterConfig[]>(loadCharacters);
+  const [activeCharId, setActiveCharId] = useState<string | null>(() => {
+    return loadActiveCharId();
+  });
+  const [editingCharacter, setEditingCharacter] = useState<CharacterConfig | null>(null);
+  const [isCreatingNew, setIsCreatingNew] = useState(false);
+
+  const activeChar =
+    characters.find((c) => c.id === activeCharId) || characters[0] || createDefaultCharacter();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [emotion, setEmotion] = useState<EmotionState>({
@@ -121,16 +145,61 @@ export default function App() {
       action: animation,
       style: settings.characterStyle,
       size: SIZE_MAP[settings.characterSize],
+      character: activeChar,
     }).catch(() => { /* overlay window may not exist yet */ });
-  }, [emotion, animation, settings.characterStyle, settings.characterSize]);
+  }, [emotion, animation, settings.characterStyle, settings.characterSize, activeChar]);
+
+  // ─── Onboarding ──────────────────────────────────────────
+  const handleOnboardingComplete = useCallback((char: CharacterConfig) => {
+    const newChars = [char];
+    saveCharacters(newChars);
+    setActiveCharacterId(char.id);
+    setCharacters(newChars);
+    setActiveCharId(char.id);
+    setOnboarded();
+    setOnboardedState(true);
+  }, []);
+
+  if (!onboarded) {
+    return <Onboarding onComplete={handleOnboardingComplete} />;
+  }
+
+  // ─── Character editing ───────────────────────────────────
+  const handleEditCharacter = () => {
+    setEditingCharacter({ ...activeChar });
+    setIsCreatingNew(false);
+  };
+
+  const handleNewCharacter = () => {
+    setEditingCharacter(createDefaultCharacter());
+    setIsCreatingNew(true);
+  };
+
+  const handleSaveCharacter = (char: CharacterConfig) => {
+    let newChars: CharacterConfig[];
+    if (isCreatingNew) {
+      newChars = [...characters, char];
+    } else {
+      newChars = characters.map((c) => (c.id === char.id ? char : c));
+    }
+    saveCharacters(newChars);
+    setActiveCharacterId(char.id);
+    setCharacters(newChars);
+    setActiveCharId(char.id);
+    setEditingCharacter(null);
+    setIsCreatingNew(false);
+  };
+
+  const handleSwitchCharacter = (id: string) => {
+    setActiveCharacterId(id);
+    setActiveCharId(id);
+  };
 
   if (!connected) {
     return <ConnectionSetup initial={config} onSave={handleConnect} />;
   }
 
   const charSize = SIZE_MAP[settings.characterSize];
-  const CharacterComponent =
-    settings.characterStyle === "skeletal" ? SkeletalCharacter : SpriteCharacter;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
@@ -160,7 +229,11 @@ export default function App() {
               background: "var(--bg-secondary)",
             }}
           >
-            <CharacterComponent emotion={emotion} action={animation} size={charSize} />
+            {settings.characterStyle === "skeletal" ? (
+              <SkeletalCharacter emotion={emotion} action={animation} size={charSize} />
+            ) : (
+              <DynamicCharacter config={activeChar} emotion={emotion} action={animation} size={charSize} />
+            )}
           </div>
         )}
       </div>
@@ -169,7 +242,29 @@ export default function App() {
           settings={settings}
           onUpdate={setSettings}
           onClose={() => setShowSettings(false)}
+          characters={characters}
+          activeCharacterId={activeChar.id}
+          onEditCharacter={handleEditCharacter}
+          onNewCharacter={handleNewCharacter}
+          onSwitchCharacter={handleSwitchCharacter}
         />
+      )}
+      {editingCharacter && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--bg)" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
+            <h2 style={{ margin: 0, fontSize: 18 }}>
+              {isCreatingNew ? "Create New Character" : "Edit Character"}
+            </h2>
+          </div>
+          <div style={{ height: "calc(100vh - 60px)", overflow: "hidden" }}>
+            <CharacterCreator
+              initial={editingCharacter}
+              onSave={handleSaveCharacter}
+              onCancel={() => { setEditingCharacter(null); setIsCreatingNew(false); }}
+              saveLabel={isCreatingNew ? "Create Character" : "Save Changes"}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

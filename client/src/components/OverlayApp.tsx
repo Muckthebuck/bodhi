@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { SpriteCharacter } from "./SpriteCharacter";
 import { SkeletalCharacter } from "./SkeletalCharacter";
+import { DynamicCharacter } from "../character/DynamicCharacter";
+import { createDefaultCharacter, type CharacterConfig } from "../character/types";
 import type { AnimationAction, EmotionState } from "../types";
 
 type CharacterStyle = "sprite" | "skeletal";
@@ -11,6 +12,7 @@ interface OverlayState {
   action: AnimationAction;
   style: CharacterStyle;
   size: number;
+  character?: CharacterConfig;
 }
 
 /**
@@ -34,9 +36,6 @@ export function OverlayApp() {
     };
   }, []);
 
-  const Character =
-    state.style === "skeletal" ? SkeletalCharacter : SpriteCharacter;
-
   return (
     <div
       style={{
@@ -48,7 +47,16 @@ export function OverlayApp() {
         background: "transparent",
       }}
     >
-      <Character emotion={state.emotion} action={state.action} size={state.size} />
+      {state.style === "skeletal" ? (
+        <SkeletalCharacter emotion={state.emotion} action={state.action} size={state.size} />
+      ) : (
+        <DynamicCharacter
+          config={state.character || createDefaultCharacter()}
+          emotion={state.emotion}
+          action={state.action}
+          size={state.size}
+        />
+      )}
     </div>
   );
 }

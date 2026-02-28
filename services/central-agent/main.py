@@ -11,7 +11,7 @@ import httpx
 import metrics
 import structlog
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from neo4j import AsyncGraphDatabase
 from prometheus_client import make_asgi_app
 from pydantic import BaseModel, Field
@@ -43,6 +43,7 @@ _state: dict[str, Any] = {
     "agent_last_seen": {},  # {agent_name: float timestamp}
     "pending_responses": {},
     "http_client": None,
+    "ws_clients": {},  # {session_id: set[WebSocket]}
 }
 
 
@@ -78,6 +79,29 @@ async def _fetch_memory_context(text: str, session_id: str) -> list[str]:
     return []
 
 
+async def _broadcast_to_ws(msg: dict, session_id: str | None = None) -> None:
+    """Send a JSON message to connected WebSocket clients.
+    If session_id is given, only send to clients on that session.
+    Otherwise broadcast to all."""
+    targets: list[WebSocket] = []
+    if session_id and session_id in _state["ws_clients"]:
+        targets = list(_state["ws_clients"][session_id])
+    elif session_id is None:
+        for sockets in _state["ws_clients"].values():
+            targets.extend(sockets)
+    dead: list[tuple[str, WebSocket]] = []
+    for ws in targets:
+        try:
+            await ws.send_json(msg)
+        except Exception:
+            # find session for this ws to clean up
+            for sid, sockets in _state["ws_clients"].items():
+                if ws in sockets:
+                    dead.append((sid, ws))
+    for sid, ws in dead:
+        _state["ws_clients"].get(sid, set()).discard(ws)
+
+
 async def _redis_subscriber() -> None:
     redis: Redis = _state["redis"]
     pubsub = redis.pubsub()
@@ -108,6 +132,18 @@ async def _redis_subscriber() -> None:
 
             elif channel == "emotion.state_changed":
                 log.info("emotion_state_changed", data=data)
+                try:
+                    emotion_data = json.loads(data)
+                    await _broadcast_to_ws(
+                        {
+                            "type": "emotion.update",
+                            "valence": emotion_data.get("valence", 0.0),
+                            "arousal": emotion_data.get("arousal", 0.0),
+                            "label": emotion_data.get("label", "neutral"),
+                        }
+                    )
+                except Exception as ws_exc:
+                    log.warning("ws_emotion_broadcast_failed", error=str(ws_exc))
 
             elif channel == "memory.stored":
                 log.info("memory_stored", data=data)
@@ -296,3 +332,104 @@ async def handle_input(body: InputRequest, request: Request) -> InputResponse:
         metrics.latency_seconds.observe(time.perf_counter() - start)
 
     return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WebSocket endpoint — real-time bidirectional chat
+# ─────────────────────────────────────────────────────────────────────────────
+
+_SESSION_ID_RE = r"^[a-zA-Z0-9_-]+$"
+
+
+@app.websocket("/ws/chat")
+async def ws_chat(
+    ws: WebSocket,
+    session_id: str = Query(..., min_length=1, max_length=100, pattern=_SESSION_ID_RE),
+):
+    await ws.accept()
+    # Register this connection
+    if session_id not in _state["ws_clients"]:
+        _state["ws_clients"][session_id] = set()
+    _state["ws_clients"][session_id].add(ws)
+    log.info("ws_client_connected", session_id=session_id)
+
+    try:
+        while True:
+            raw = await ws.receive_json()
+            msg_type = raw.get("type")
+
+            if msg_type != "user.message":
+                await ws.send_json({"type": "error", "detail": f"unknown type: {msg_type}"})
+                continue
+
+            text = (raw.get("text") or "").strip()
+            if not text or len(text) > 2_000:
+                await ws.send_json({"type": "error", "detail": "text must be 1-2000 chars"})
+                continue
+
+            request_id = raw.get("request_id") or str(uuid.uuid4())
+
+            if not _state["redis"]:
+                await ws.send_json(
+                    {"type": "error", "request_id": request_id, "detail": "Redis unavailable"}
+                )
+                continue
+
+            start = time.perf_counter()
+            future: asyncio.Future[str] = asyncio.get_event_loop().create_future()
+            _state["pending_responses"][request_id] = future
+
+            # Send animation.command → talking
+            await ws.send_json(
+                {"type": "animation.command", "action": "thinking", "request_id": request_id}
+            )
+
+            memory_context = await _fetch_memory_context(text, session_id)
+            payload = json.dumps(
+                {
+                    "request_id": request_id,
+                    "session_id": session_id,
+                    "text": text,
+                    "memory_context": memory_context,
+                }
+            )
+
+            try:
+                await asyncio.wait_for(_state["redis"].publish("user.input", payload), timeout=2.0)
+            except asyncio.TimeoutError:
+                await ws.send_json(
+                    {"type": "error", "request_id": request_id, "detail": "publish timeout"}
+                )
+                _state["pending_responses"].pop(request_id, None)
+                metrics.requests_total.labels(status="error").inc()
+                continue
+
+            try:
+                response_text = await asyncio.wait_for(future, timeout=RESPONSE_TIMEOUT)
+                await ws.send_json(
+                    {"type": "animation.command", "action": "talking", "request_id": request_id}
+                )
+                await ws.send_json(
+                    {"type": "response.text", "request_id": request_id, "text": response_text}
+                )
+                await ws.send_json(
+                    {"type": "animation.command", "action": "idle", "request_id": request_id}
+                )
+                metrics.requests_total.labels(status="success").inc()
+            except asyncio.TimeoutError:
+                await ws.send_json(
+                    {"type": "error", "request_id": request_id, "detail": "response timeout"}
+                )
+                metrics.requests_total.labels(status="timeout").inc()
+            finally:
+                _state["pending_responses"].pop(request_id, None)
+                metrics.latency_seconds.observe(time.perf_counter() - start)
+
+    except WebSocketDisconnect:
+        log.info("ws_client_disconnected", session_id=session_id)
+    except Exception as exc:
+        log.error("ws_error", session_id=session_id, error=str(exc))
+    finally:
+        _state["ws_clients"].get(session_id, set()).discard(ws)
+        if not _state["ws_clients"].get(session_id):
+            _state["ws_clients"].pop(session_id, None)

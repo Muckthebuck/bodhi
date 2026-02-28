@@ -13,11 +13,13 @@ interface OverlayState {
   style: CharacterStyle;
   size: number;
   character?: CharacterConfig;
+  visible?: boolean;
 }
 
 /**
  * Overlay window — receives state from main window via Tauri events.
  * Renders the character on a fully transparent background.
+ * Only shows content when visible flag is true.
  */
 export function OverlayApp() {
   const [state, setState] = useState<OverlayState>({
@@ -25,6 +27,7 @@ export function OverlayApp() {
     action: "idle",
     style: "sprite",
     size: 128,
+    visible: false,
   });
 
   useEffect(() => {
@@ -35,6 +38,11 @@ export function OverlayApp() {
       unlisten.then((fn) => fn());
     };
   }, []);
+
+  // Don't render anything when hidden
+  if (!state.visible) {
+    return null;
+  }
 
   return (
     <div

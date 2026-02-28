@@ -1,13 +1,17 @@
 /**
- * Character customization editor with live preview.
- * Used in onboarding and settings.
+ * Character customization editor — Animal Crossing-style visual UI.
+ * Warm pastel theme with visual preview cards for every option.
  */
 
 import { useState } from "react";
+import "../styles/character-creator.css";
 import type {
   CharacterConfig,
   HairStyle,
   EyeStyle,
+  NoseStyle,
+  MouthStyle,
+  BlushStyle,
   FaceShape,
   OutfitStyle,
   Accessory,
@@ -17,13 +21,17 @@ import {
   HAIR_COLORS,
   EYE_COLORS,
   OUTFIT_COLORS,
+  ACCESSORY_COLORS,
   HAIR_STYLES,
   EYE_STYLES,
+  NOSE_STYLES,
+  MOUTH_STYLES,
+  BLUSH_STYLES,
   FACE_SHAPES,
   OUTFIT_STYLES,
   ACCESSORIES,
 } from "../character/types";
-import { DynamicCharacter } from "../character/DynamicCharacter";
+import { DynamicCharacter, PartPreview } from "../character/DynamicCharacter";
 
 interface Props {
   initial: CharacterConfig;
@@ -32,15 +40,23 @@ interface Props {
   saveLabel?: string;
 }
 
-type Category = "face" | "hair" | "eyes" | "outfit" | "accessories";
+type Category = "face" | "hair" | "eyes" | "outfit" | "extras";
 
 const CATEGORIES: { id: Category; label: string; icon: string }[] = [
   { id: "face", label: "Face", icon: "😊" },
   { id: "hair", label: "Hair", icon: "💇" },
-  { id: "eyes", label: "Eyes", icon: "👁" },
+  { id: "eyes", label: "Eyes", icon: "👁️" },
   { id: "outfit", label: "Outfit", icon: "👕" },
-  { id: "accessories", label: "Extras", icon: "🎀" },
+  { id: "extras", label: "Extras", icon: "✨" },
 ];
+
+function isLight(hex: string): boolean {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 0xff;
+  const g = (n >> 8) & 0xff;
+  const b = n & 0xff;
+  return r * 0.299 + g * 0.587 + b * 0.114 > 160;
+}
 
 export function CharacterCreator({ initial, onSave, onCancel, saveLabel = "Save" }: Props) {
   const [config, setConfig] = useState<CharacterConfig>({ ...initial });
@@ -51,298 +67,243 @@ export function CharacterCreator({ initial, onSave, onCancel, saveLabel = "Save"
   };
 
   return (
-    <div style={containerStyle}>
-      {/* Preview area */}
-      <div style={previewStyle}>
-        <DynamicCharacter
-          config={config}
-          emotion={{ valence: 0.3, arousal: 0.2, label: "happy" }}
-          action="idle"
-          size={160}
-        />
+    <div className="cc-theme cc-container">
+      {/* ─── Live Preview ─────────────────────── */}
+      <div className="cc-preview">
+        <div className="cc-preview-stage cc-preview-stage-lg">
+          <DynamicCharacter
+            config={config}
+            emotion={{ valence: 0, arousal: 0, label: "idle" }}
+            action="idle"
+            size={120}
+          />
+        </div>
         <input
+          className="cc-name-input"
           type="text"
           value={config.name}
           onChange={(e) => update("name", e.target.value)}
-          placeholder="Character name"
-          style={nameInputStyle}
+          placeholder="Name your companion"
         />
       </div>
 
-      {/* Category tabs */}
-      <div style={tabsStyle}>
+      {/* ─── Category Tabs ────────────────────── */}
+      <div className="cc-categories">
         {CATEGORIES.map((cat) => (
           <button
             key={cat.id}
+            className={`cc-cat-btn ${category === cat.id ? "active" : ""}`}
             onClick={() => setCategory(cat.id)}
-            style={{
-              ...tabStyle,
-              ...(category === cat.id ? activeTabStyle : {}),
-            }}
           >
-            {cat.icon} {cat.label}
+            <span className="cc-cat-icon">{cat.icon}</span>
+            {cat.label}
           </button>
         ))}
       </div>
 
-      {/* Options panel */}
-      <div style={optionsStyle}>
+      {/* ─── Options Panel ────────────────────── */}
+      <div className="cc-options">
         {category === "face" && (
           <>
-            <OptionLabel>Skin Tone</OptionLabel>
-            <ColorPalette
-              colors={SKIN_TONES}
-              selected={config.skinTone}
-              onSelect={(v) => update("skinTone", v)}
-            />
-            <OptionLabel>Face Shape</OptionLabel>
-            <StylePicker
-              options={FACE_SHAPES}
-              selected={config.faceShape}
-              onSelect={(v) => update("faceShape", v as FaceShape)}
-            />
+            <div className="cc-section-label">Skin Tone</div>
+            <div className="cc-colors cc-colors-lg">
+              {SKIN_TONES.map((c) => (
+                <button
+                  key={c.value}
+                  className={`cc-swatch ${config.skinTone === c.value ? "selected" : ""} ${isLight(c.value) ? "light" : ""}`}
+                  style={{ background: c.value }}
+                  onClick={() => update("skinTone", c.value)}
+                  title={c.label}
+                />
+              ))}
+            </div>
+
+            <div className="cc-section-label">Face Shape</div>
+            <div className="cc-styles">
+              {FACE_SHAPES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`cc-style-card ${config.faceShape === s.value ? "selected" : ""}`}
+                  onClick={() => update("faceShape", s.value as FaceShape)}
+                >
+                  <PartPreview config={{ ...config, faceShape: s.value as FaceShape }} focus="face" size={72} />
+                </button>
+              ))}
+            </div>
+
+            <div className="cc-section-label">Nose</div>
+            <div className="cc-styles">
+              {NOSE_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`cc-style-card ${config.noseStyle === s.value ? "selected" : ""}`}
+                  onClick={() => update("noseStyle", s.value as NoseStyle)}
+                >
+                  <PartPreview config={{ ...config, noseStyle: s.value as NoseStyle }} focus="nose" size={72} />
+                </button>
+              ))}
+            </div>
+
+            <div className="cc-section-label">Mouth</div>
+            <div className="cc-styles">
+              {MOUTH_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`cc-style-card ${config.mouthStyle === s.value ? "selected" : ""}`}
+                  onClick={() => update("mouthStyle", s.value as MouthStyle)}
+                >
+                  <PartPreview config={{ ...config, mouthStyle: s.value as MouthStyle }} focus="mouth" size={72} />
+                </button>
+              ))}
+            </div>
+
+            <div className="cc-section-label">Blush</div>
+            <div className="cc-styles">
+              {BLUSH_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`cc-style-card ${config.blushStyle === s.value ? "selected" : ""}`}
+                  onClick={() => update("blushStyle", s.value as BlushStyle)}
+                >
+                  <PartPreview config={{ ...config, blushStyle: s.value as BlushStyle }} focus="blush" size={72} />
+                </button>
+              ))}
+            </div>
           </>
         )}
+
         {category === "hair" && (
           <>
-            <OptionLabel>Hair Style</OptionLabel>
-            <StylePicker
-              options={HAIR_STYLES}
-              selected={config.hairStyle}
-              onSelect={(v) => update("hairStyle", v as HairStyle)}
-            />
-            <OptionLabel>Hair Color</OptionLabel>
-            <ColorPalette
-              colors={HAIR_COLORS}
-              selected={config.hairColor}
-              onSelect={(v) => update("hairColor", v)}
-            />
+            <div className="cc-section-label">Hair Color</div>
+            <div className="cc-colors">
+              {HAIR_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  className={`cc-swatch ${config.hairColor === c.value ? "selected" : ""} ${isLight(c.value) ? "light" : ""}`}
+                  style={{ background: c.value }}
+                  onClick={() => update("hairColor", c.value)}
+                  title={c.label}
+                />
+              ))}
+            </div>
+
+            <div className="cc-section-label">Hair Style</div>
+            <div className="cc-styles">
+              {HAIR_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`cc-style-card ${config.hairStyle === s.value ? "selected" : ""}`}
+                  onClick={() => update("hairStyle", s.value as HairStyle)}
+                >
+                  <PartPreview config={{ ...config, hairStyle: s.value as HairStyle }} focus="hair" size={72} />
+                </button>
+              ))}
+            </div>
           </>
         )}
+
         {category === "eyes" && (
           <>
-            <OptionLabel>Eye Style</OptionLabel>
-            <StylePicker
-              options={EYE_STYLES}
-              selected={config.eyeStyle}
-              onSelect={(v) => update("eyeStyle", v as EyeStyle)}
-            />
-            <OptionLabel>Eye Color</OptionLabel>
-            <ColorPalette
-              colors={EYE_COLORS}
-              selected={config.eyeColor}
-              onSelect={(v) => update("eyeColor", v)}
-            />
+            <div className="cc-section-label">Eye Color</div>
+            <div className="cc-colors">
+              {EYE_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  className={`cc-swatch ${config.eyeColor === c.value ? "selected" : ""} ${isLight(c.value) ? "light" : ""}`}
+                  style={{ background: c.value }}
+                  onClick={() => update("eyeColor", c.value)}
+                  title={c.label}
+                />
+              ))}
+            </div>
+
+            <div className="cc-section-label">Eye Style</div>
+            <div className="cc-styles">
+              {EYE_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`cc-style-card ${config.eyeStyle === s.value ? "selected" : ""}`}
+                  onClick={() => update("eyeStyle", s.value as EyeStyle)}
+                >
+                  <PartPreview config={{ ...config, eyeStyle: s.value as EyeStyle }} focus="eyes" size={72} />
+                </button>
+              ))}
+            </div>
           </>
         )}
+
         {category === "outfit" && (
           <>
-            <OptionLabel>Outfit Style</OptionLabel>
-            <StylePicker
-              options={OUTFIT_STYLES}
-              selected={config.outfitStyle}
-              onSelect={(v) => update("outfitStyle", v as OutfitStyle)}
-            />
-            <OptionLabel>Outfit Color</OptionLabel>
-            <ColorPalette
-              colors={OUTFIT_COLORS}
-              selected={config.outfitColor}
-              onSelect={(v) => update("outfitColor", v)}
-            />
+            <div className="cc-section-label">Outfit Color</div>
+            <div className="cc-colors">
+              {OUTFIT_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  className={`cc-swatch ${config.outfitColor === c.value ? "selected" : ""} ${isLight(c.value) ? "light" : ""}`}
+                  style={{ background: c.value }}
+                  onClick={() => update("outfitColor", c.value)}
+                  title={c.label}
+                />
+              ))}
+            </div>
+
+            <div className="cc-section-label">Outfit Style</div>
+            <div className="cc-styles">
+              {OUTFIT_STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`cc-style-card ${config.outfitStyle === s.value ? "selected" : ""}`}
+                  onClick={() => update("outfitStyle", s.value as OutfitStyle)}
+                >
+                  <PartPreview config={{ ...config, outfitStyle: s.value as OutfitStyle }} focus="outfit" size={72} />
+                </button>
+              ))}
+            </div>
           </>
         )}
-        {category === "accessories" && (
+
+        {category === "extras" && (
           <>
-            <OptionLabel>Accessory</OptionLabel>
-            <StylePicker
-              options={ACCESSORIES}
-              selected={config.accessory}
-              onSelect={(v) => update("accessory", v as Accessory)}
-            />
+            <div className="cc-section-label">Accessory Color</div>
+            <div className="cc-colors">
+              {ACCESSORY_COLORS.map((c) => (
+                <button
+                  key={c.value}
+                  className={`cc-swatch ${config.accessoryColor === c.value ? "selected" : ""} ${isLight(c.value) ? "light" : ""}`}
+                  style={{ background: c.value }}
+                  onClick={() => update("accessoryColor", c.value)}
+                  title={c.label}
+                />
+              ))}
+            </div>
+
+            <div className="cc-section-label">Accessory</div>
+            <div className="cc-styles">
+              {ACCESSORIES.map((s) => (
+                <button
+                  key={s.value}
+                  className={`cc-style-card ${config.accessory === s.value ? "selected" : ""}`}
+                  onClick={() => update("accessory", s.value as Accessory)}
+                >
+                  <PartPreview config={{ ...config, accessory: s.value as Accessory }} focus="accessory" size={72} />
+                </button>
+              ))}
+            </div>
           </>
         )}
       </div>
 
-      {/* Action buttons */}
-      <div style={actionsStyle}>
+      {/* ─── Action Buttons ───────────────────── */}
+      <div className="cc-actions">
         {onCancel && (
-          <button onClick={onCancel} style={cancelBtnStyle}>
+          <button className="cc-cancel-btn" onClick={onCancel}>
             Cancel
           </button>
         )}
-        <button onClick={() => onSave(config)} style={saveBtnStyle}>
+        <button className="cc-save-btn" onClick={() => onSave(config)}>
           {saveLabel}
         </button>
       </div>
     </div>
   );
 }
-
-// ─── Sub-components ──────────────────────────────────────────
-
-function OptionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ color: "var(--text-muted)", fontSize: 12, marginTop: 12, marginBottom: 4 }}>
-      {children}
-    </div>
-  );
-}
-
-function ColorPalette({
-  colors,
-  selected,
-  onSelect,
-}: {
-  colors: { value: string; label: string }[];
-  selected: string;
-  onSelect: (color: string) => void;
-}) {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-      {colors.map((c) => (
-        <button
-          key={c.value}
-          onClick={() => onSelect(c.value)}
-          title={c.label}
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            border: selected === c.value ? "3px solid var(--accent-bright)" : "2px solid var(--border)",
-            background: c.value,
-            cursor: "pointer",
-            transition: "transform 0.1s",
-            transform: selected === c.value ? "scale(1.15)" : "scale(1)",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function StylePicker({
-  options,
-  selected,
-  onSelect,
-}: {
-  options: { value: string; label: string }[];
-  selected: string;
-  onSelect: (value: string) => void;
-}) {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          onClick={() => onSelect(o.value)}
-          style={{
-            padding: "6px 14px",
-            borderRadius: 20,
-            border:
-              selected === o.value
-                ? "2px solid var(--accent-bright)"
-                : "1px solid var(--border)",
-            background: selected === o.value ? "var(--accent)" : "var(--bg)",
-            color: "var(--text)",
-            cursor: "pointer",
-            fontSize: 12,
-          }}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Styles ──────────────────────────────────────────────────
-
-const containerStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  height: "100%",
-  padding: 20,
-  gap: 12,
-  overflow: "hidden",
-};
-
-const previewStyle: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 12,
-  padding: 16,
-  background: "var(--bg-secondary)",
-  borderRadius: "var(--radius)",
-};
-
-const nameInputStyle: React.CSSProperties = {
-  padding: "8px 12px",
-  borderRadius: "var(--radius)",
-  border: "1px solid var(--border)",
-  background: "var(--bg)",
-  color: "var(--text)",
-  fontSize: 16,
-  textAlign: "center",
-  width: 200,
-  outline: "none",
-};
-
-const tabsStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 4,
-  overflowX: "auto",
-};
-
-const tabStyle: React.CSSProperties = {
-  flex: 1,
-  padding: "8px 4px",
-  border: "1px solid var(--border)",
-  borderRadius: "var(--radius)",
-  background: "var(--bg)",
-  color: "var(--text-muted)",
-  cursor: "pointer",
-  fontSize: 11,
-  whiteSpace: "nowrap",
-};
-
-const activeTabStyle: React.CSSProperties = {
-  background: "var(--accent)",
-  color: "var(--text)",
-  borderColor: "var(--accent-bright)",
-};
-
-const optionsStyle: React.CSSProperties = {
-  flex: 1,
-  overflowY: "auto",
-  padding: "4px 0",
-};
-
-const actionsStyle: React.CSSProperties = {
-  display: "flex",
-  gap: 8,
-  justifyContent: "flex-end",
-  paddingTop: 8,
-  borderTop: "1px solid var(--border)",
-};
-
-const saveBtnStyle: React.CSSProperties = {
-  padding: "10px 24px",
-  borderRadius: "var(--radius)",
-  border: "none",
-  background: "var(--accent-bright)",
-  color: "#fff",
-  cursor: "pointer",
-  fontSize: 14,
-  fontWeight: 600,
-};
-
-const cancelBtnStyle: React.CSSProperties = {
-  padding: "10px 24px",
-  borderRadius: "var(--radius)",
-  border: "1px solid var(--border)",
-  background: "transparent",
-  color: "var(--text-muted)",
-  cursor: "pointer",
-  fontSize: 14,
-};

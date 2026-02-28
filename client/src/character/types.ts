@@ -8,16 +8,33 @@ export interface CharacterConfig {
   hairStyle: HairStyle;
   eyeColor: string;
   eyeStyle: EyeStyle;
+  noseStyle: NoseStyle;
+  mouthStyle: MouthStyle;
+  blushStyle: BlushStyle;
   faceShape: FaceShape;
   outfitColor: string;
   outfitStyle: OutfitStyle;
   accessory: Accessory;
+  accessoryColor: string;
 }
 
-export type HairStyle = "short" | "long" | "curly" | "spiky" | "bob" | "ponytail";
-export type EyeStyle = "round" | "narrow" | "wide" | "cat";
-export type FaceShape = "round" | "oval" | "heart";
-export type OutfitStyle = "hoodie" | "tshirt" | "dress" | "jacket";
+export type HairStyle =
+  | "short"
+  | "long"
+  | "curly"
+  | "spiky"
+  | "bob"
+  | "ponytail"
+  | "twintails"
+  | "buns"
+  | "messy"
+  | "sideshave";
+export type EyeStyle = "round" | "oval" | "wide" | "cat" | "dot" | "sparkle";
+export type NoseStyle = "none" | "dot" | "triangle" | "round" | "button";
+export type MouthStyle = "smile" | "cat" | "line" | "open" | "smirk";
+export type BlushStyle = "circle" | "oval" | "none";
+export type FaceShape = "round" | "oval" | "soft-square";
+export type OutfitStyle = "hoodie" | "tshirt" | "dress" | "overalls" | "jacket";
 export type Accessory =
   | "none"
   | "glasses"
@@ -25,7 +42,8 @@ export type Accessory =
   | "hat"
   | "bow"
   | "headband"
-  | "sunglasses";
+  | "sunglasses"
+  | "bandaid";
 
 export interface ColorOption {
   value: string;
@@ -35,6 +53,7 @@ export interface ColorOption {
 export interface StyleOption<T> {
   value: T;
   label: string;
+  icon?: string;
 }
 
 // ─── Color Palettes ──────────────────────────────────────────
@@ -42,45 +61,64 @@ export interface StyleOption<T> {
 export const SKIN_TONES: ColorOption[] = [
   { value: "#fde8d0", label: "Light" },
   { value: "#f5d0a9", label: "Fair" },
+  { value: "#e8b88a", label: "Warm" },
   { value: "#d4a574", label: "Medium" },
   { value: "#c4956a", label: "Olive" },
+  { value: "#a87553", label: "Tan" },
   { value: "#8d5524", label: "Brown" },
   { value: "#5c3d2e", label: "Dark" },
 ];
 
 export const HAIR_COLORS: ColorOption[] = [
-  { value: "#1a1a2e", label: "Black" },
-  { value: "#3d2b1f", label: "Dark Brown" },
-  { value: "#6b4423", label: "Brown" },
-  { value: "#922b05", label: "Auburn" },
-  { value: "#c9a94e", label: "Blonde" },
-  { value: "#e8dcc8", label: "Platinum" },
-  { value: "#b33030", label: "Red" },
-  { value: "#2c3e6b", label: "Blue" },
-  { value: "#6b3fa0", label: "Purple" },
-  { value: "#d4739d", label: "Pink" },
+  { value: "#4a4458", label: "Charcoal" },
+  { value: "#8b7b6b", label: "Cocoa" },
+  { value: "#c4a882", label: "Caramel" },
+  { value: "#e6b8a2", label: "Peach" },
+  { value: "#f2d8a8", label: "Honey" },
+  { value: "#f5ede0", label: "Cream" },
+  { value: "#e8a8a8", label: "Coral" },
+  { value: "#f2b8d4", label: "Bubblegum" },
+  { value: "#a8cce8", label: "Sky Blue" },
+  { value: "#c8b4e2", label: "Lavender" },
+  { value: "#a2d4c4", label: "Seafoam" },
+  { value: "#e6e2ee", label: "Pearl" },
 ];
 
 export const EYE_COLORS: ColorOption[] = [
-  { value: "#5c3317", label: "Brown" },
-  { value: "#3b82f6", label: "Blue" },
-  { value: "#22c55e", label: "Green" },
-  { value: "#6b7280", label: "Gray" },
-  { value: "#d97706", label: "Amber" },
-  { value: "#8b5cf6", label: "Purple" },
+  { value: "#8b7260", label: "Cocoa" },
+  { value: "#8bb8e0", label: "Baby Blue" },
+  { value: "#88c4a0", label: "Sage" },
+  { value: "#a8a8ba", label: "Silver" },
+  { value: "#d4b478", label: "Honey" },
+  { value: "#b8a2d8", label: "Lilac" },
+  { value: "#525264", label: "Charcoal" },
 ];
 
 export const OUTFIT_COLORS: ColorOption[] = [
-  { value: "#53a8b6", label: "Teal" },
-  { value: "#ef4444", label: "Red" },
-  { value: "#3b82f6", label: "Blue" },
-  { value: "#22c55e", label: "Green" },
-  { value: "#8b5cf6", label: "Purple" },
-  { value: "#f97316", label: "Orange" },
-  { value: "#ec4899", label: "Pink" },
-  { value: "#eab308", label: "Yellow" },
-  { value: "#6b7280", label: "Gray" },
-  { value: "#1a1a2e", label: "Black" },
+  { value: "#8ac4cc", label: "Soft Teal" },
+  { value: "#e8a8a8", label: "Rose" },
+  { value: "#a2bee8", label: "Powder Blue" },
+  { value: "#a2d8b2", label: "Mint" },
+  { value: "#c2a8e2", label: "Wisteria" },
+  { value: "#f0c4a2", label: "Peach" },
+  { value: "#f0b4c8", label: "Blush" },
+  { value: "#f0dea2", label: "Buttercream" },
+  { value: "#f5ede0", label: "Ivory" },
+  { value: "#b2b2bc", label: "Dove" },
+  { value: "#5a5a6a", label: "Charcoal" },
+];
+
+export const ACCESSORY_COLORS: ColorOption[] = [
+  { value: "#4a4458", label: "Charcoal" },
+  { value: "#8b7260", label: "Cocoa" },
+  { value: "#c2a8e2", label: "Wisteria" },
+  { value: "#e8a8a8", label: "Rose" },
+  { value: "#a8cce8", label: "Sky Blue" },
+  { value: "#a2d8b2", label: "Mint" },
+  { value: "#f0c4a2", label: "Peach" },
+  { value: "#f0dea2", label: "Buttercream" },
+  { value: "#f5ede0", label: "Ivory" },
+  { value: "#ef4444", label: "Cherry" },
 ];
 
 // ─── Style Options ───────────────────────────────────────────
@@ -92,25 +130,54 @@ export const HAIR_STYLES: StyleOption<HairStyle>[] = [
   { value: "spiky", label: "Spiky" },
   { value: "bob", label: "Bob" },
   { value: "ponytail", label: "Ponytail" },
+  { value: "twintails", label: "Twintails" },
+  { value: "buns", label: "Buns" },
+  { value: "messy", label: "Messy" },
+  { value: "sideshave", label: "Side Shave" },
 ];
 
 export const EYE_STYLES: StyleOption<EyeStyle>[] = [
   { value: "round", label: "Round" },
-  { value: "narrow", label: "Narrow" },
+  { value: "oval", label: "Oval" },
   { value: "wide", label: "Wide" },
   { value: "cat", label: "Cat" },
+  { value: "dot", label: "Dot" },
+  { value: "sparkle", label: "Sparkle" },
+];
+
+export const NOSE_STYLES: StyleOption<NoseStyle>[] = [
+  { value: "none", label: "None" },
+  { value: "dot", label: "Dot" },
+  { value: "triangle", label: "Triangle" },
+  { value: "round", label: "Round" },
+  { value: "button", label: "Button" },
+];
+
+export const MOUTH_STYLES: StyleOption<MouthStyle>[] = [
+  { value: "smile", label: "Smile" },
+  { value: "cat", label: "Cat" },
+  { value: "line", label: "Line" },
+  { value: "open", label: "Open" },
+  { value: "smirk", label: "Smirk" },
+];
+
+export const BLUSH_STYLES: StyleOption<BlushStyle>[] = [
+  { value: "circle", label: "Circle" },
+  { value: "oval", label: "Oval" },
+  { value: "none", label: "None" },
 ];
 
 export const FACE_SHAPES: StyleOption<FaceShape>[] = [
   { value: "round", label: "Round" },
   { value: "oval", label: "Oval" },
-  { value: "heart", label: "Heart" },
+  { value: "soft-square", label: "Soft Square" },
 ];
 
 export const OUTFIT_STYLES: StyleOption<OutfitStyle>[] = [
   { value: "hoodie", label: "Hoodie" },
   { value: "tshirt", label: "T-Shirt" },
   { value: "dress", label: "Dress" },
+  { value: "overalls", label: "Overalls" },
   { value: "jacket", label: "Jacket" },
 ];
 
@@ -122,6 +189,7 @@ export const ACCESSORIES: StyleOption<Accessory>[] = [
   { value: "bow", label: "Bow" },
   { value: "headband", label: "Headband" },
   { value: "sunglasses", label: "Sunglasses" },
+  { value: "bandaid", label: "Band-Aid" },
 ];
 
 // ─── Defaults & Factory ─────────────────────────────────────
@@ -131,14 +199,18 @@ export function createDefaultCharacter(): CharacterConfig {
     id: crypto.randomUUID(),
     name: "Bodhi",
     skinTone: "#fde8d0",
-    hairColor: "#2c3e6b",
+    hairColor: "#a8cce8",
     hairStyle: "short",
-    eyeColor: "#3b82f6",
+    eyeColor: "#8bb8e0",
     eyeStyle: "round",
+    noseStyle: "dot",
+    mouthStyle: "smile",
+    blushStyle: "circle",
     faceShape: "round",
-    outfitColor: "#53a8b6",
+    outfitColor: "#8ac4cc",
     outfitStyle: "hoodie",
     accessory: "none",
+    accessoryColor: "#4a4458",
   };
 }
 

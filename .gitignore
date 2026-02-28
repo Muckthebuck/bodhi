@@ -74,3 +74,6 @@ grafana-data/
 
 # Session state
 session-state/
+
+.vite/
+*.backup

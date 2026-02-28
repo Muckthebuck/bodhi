@@ -35,3 +35,5 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Character SVG animation is now lerp-based in JS — no CSS transitions needed */

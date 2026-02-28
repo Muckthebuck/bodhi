@@ -32,7 +32,7 @@ function defaultSettings(): AppSettings {
     characterStyle: "sprite",
     characterSize: "medium",
     characterPosition: "bottom-right",
-    showCharacter: true,
+    showCharacter: false,
   };
 }
 

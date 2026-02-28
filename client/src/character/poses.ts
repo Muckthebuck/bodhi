@@ -65,8 +65,8 @@ export const ANIMATION_POSES: Record<AnimState, PoseFrame[]> = {
     { eyes: "lookUp", mouth: "smallO", arms: "think", legs: "default", headDy: -2, bodyTilt: 0, extras: ["question"] },
   ],
   happy: [
-    { eyes: "happy", mouth: "bigSmile", arms: "default", legs: "default", headDy: -3, bodyTilt: 0, extras: ["sparkles", "hearts"] },
-    { eyes: "happy", mouth: "bigSmile", arms: "default", legs: "default", headDy: -1, bodyTilt: 0, extras: ["sparkles"] },
+    { eyes: "happy", mouth: "bigSmile", arms: "default", legs: "default", headDy: -3, bodyTilt: 0, extras: [] },
+    { eyes: "happy", mouth: "bigSmile", arms: "default", legs: "default", headDy: -1, bodyTilt: 0, extras: [] },
   ],
   sad: [
     { eyes: "sad", mouth: "sad", arms: "hug", legs: "default", headDy: 2, bodyTilt: 0, extras: ["tear"] },

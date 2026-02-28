@@ -16,10 +16,10 @@ pub fn run() {
                 )?;
             }
 
-            // Show the overlay window on startup
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                let _ = overlay.show();
-            }
+            // Don't show overlay on startup — controlled by frontend settings
+            // if let Some(overlay) = app.get_webview_window("overlay") {
+            //     let _ = overlay.show();
+            // }
 
             // System tray
             let show = MenuItem::with_id(app, "show", "Open Bodhi", true, None::<&str>)?;

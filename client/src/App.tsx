@@ -146,8 +146,9 @@ export default function App() {
       style: settings.characterStyle,
       size: SIZE_MAP[settings.characterSize],
       character: activeChar,
+      visible: settings.showCharacter,
     }).catch(() => { /* overlay window may not exist yet */ });
-  }, [emotion, animation, settings.characterStyle, settings.characterSize, activeChar]);
+  }, [emotion, animation, settings.characterStyle, settings.characterSize, activeChar, settings.showCharacter]);
 
   // ─── Onboarding ──────────────────────────────────────────
   const handleOnboardingComplete = useCallback((char: CharacterConfig) => {
@@ -250,18 +251,18 @@ export default function App() {
         />
       )}
       {editingCharacter && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--bg)" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
-            <h2 style={{ margin: 0, fontSize: 18 }}>
+        <div className="cc-theme" style={{ position: "fixed", inset: 0, zIndex: 200, background: "#faf6ef" }}>
+          <div style={{ padding: "14px 24px 12px", borderBottom: "1px solid #e8e0d4", background: "#faf6ef" }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#4a4035" }}>
               {isCreatingNew ? "Create New Character" : "Edit Character"}
             </h2>
           </div>
-          <div style={{ height: "calc(100vh - 60px)", overflow: "hidden" }}>
+          <div style={{ height: "calc(100vh - 52px)", overflow: "hidden" }}>
             <CharacterCreator
               initial={editingCharacter}
               onSave={handleSaveCharacter}
               onCancel={() => { setEditingCharacter(null); setIsCreatingNew(false); }}
-              saveLabel={isCreatingNew ? "Create Character" : "Save Changes"}
+              saveLabel={isCreatingNew ? "Create" : "Save Changes"}
             />
           </div>
         </div>

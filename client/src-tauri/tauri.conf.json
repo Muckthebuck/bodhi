@@ -34,7 +34,7 @@
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
-        "visible": true,
+        "visible": false,
         "skipTaskbar": true
       }
     ],

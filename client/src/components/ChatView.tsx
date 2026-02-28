@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import type { ChatMessage, WsOutgoing } from "../types";
+import { IconSend } from "./Icons";
 
 interface Props {
   messages: ChatMessage[];
@@ -8,7 +12,9 @@ interface Props {
   isThinking: boolean;
 }
 
-export function ChatView({ messages, onSend, isConnected, isThinking }: Props) {
+export function ChatView({
+  messages, onSend, isConnected, isThinking,
+}: Props) {
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -24,44 +30,125 @@ export function ChatView({ messages, onSend, isConnected, isThinking }: Props) {
     setInput("");
   };
 
+  const isEmpty = messages.length === 0 && !isThinking;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Message list */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px" }}>
-        {messages.map((m) => (
+        {isEmpty && (
           <div
-            key={m.id}
             style={{
               display: "flex",
-              justifyContent: m.role === "user" ? "flex-end" : "flex-start",
-              marginBottom: 8,
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              color: "var(--text-muted)",
+              gap: 8,
+              userSelect: "none",
             }}
           >
+            <span style={{ fontSize: 14 }}>No messages yet</span>
+            <span style={{ fontSize: 12 }}>
+              {isConnected ? "Say something to get started" : "Connect to start chatting"}
+            </span>
+          </div>
+        )}
+        {messages.map((m) => {
+          const isUser = m.role === "user";
+          return (
             <div
+              key={m.id}
               style={{
-                maxWidth: "70%",
-                padding: "10px 14px",
-                borderRadius: "var(--radius)",
-                background:
-                  m.role === "user"
-                    ? "var(--user-bubble)"
-                    : "var(--companion-bubble)",
-                border: "1px solid var(--border)",
+                display: "flex",
+                justifyContent: isUser ? "flex-end" : "flex-start",
+                marginBottom: 10,
               }}
             >
-              {m.text}
+              <div
+                style={{
+                  maxWidth: "75%",
+                  padding: "10px 14px",
+                  borderRadius: "var(--radius)",
+                  background: isUser ? "var(--user-bubble)" : "var(--companion-bubble)",
+                  color: isUser ? "var(--user-bubble-text)" : "var(--companion-text)",
+                  boxShadow: "var(--shadow-sm)",
+                  fontSize: 14,
+                  lineHeight: 1.5,
+                  wordBreak: "break-word",
+                }}
+              >
+                {isUser ? (
+                  m.text
+                ) : (
+                  <Markdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      code({ className, children, ...props }) {
+                        const match = /language-(\w+)/.exec(className || "");
+                        const code = String(children).replace(/\n$/, "");
+                        return match ? (
+                          <SyntaxHighlighter
+                            language={match[1]}
+                            PreTag="div"
+                            customStyle={{
+                              margin: "8px 0",
+                              borderRadius: 6,
+                              fontSize: 13,
+                            }}
+                          >
+                            {code}
+                          </SyntaxHighlighter>
+                        ) : (
+                          <code
+                            className={className}
+                            style={{
+                              background: "var(--bg-secondary)",
+                              padding: "2px 5px",
+                              borderRadius: 4,
+                              fontSize: 13,
+                            }}
+                            {...props}
+                          >
+                            {children}
+                          </code>
+                        );
+                      },
+                      p({ children }) {
+                        return <p style={{ margin: "4px 0" }}>{children}</p>;
+                      },
+                      a({ href, children }) {
+                        return (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: "var(--accent-bright)" }}
+                          >
+                            {children}
+                          </a>
+                        );
+                      },
+                    }}
+                  >
+                    {m.text}
+                  </Markdown>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {isThinking && (
-          <div style={{ display: "flex", marginBottom: 8 }}>
+          <div style={{ display: "flex", marginBottom: 10 }}>
             <div
               style={{
                 padding: "10px 14px",
                 borderRadius: "var(--radius)",
                 background: "var(--companion-bubble)",
-                border: "1px solid var(--border)",
                 color: "var(--text-muted)",
+                boxShadow: "var(--shadow-sm)",
+                fontSize: 14,
               }}
             >
               Thinking…
@@ -75,6 +162,7 @@ export function ChatView({ messages, onSend, isConnected, isThinking }: Props) {
       <div
         style={{
           display: "flex",
+          alignItems: "center",
           gap: 8,
           padding: "12px 16px",
           borderTop: "1px solid var(--border)",
@@ -92,7 +180,7 @@ export function ChatView({ messages, onSend, isConnected, isThinking }: Props) {
             padding: "10px 14px",
             borderRadius: "var(--radius)",
             border: "1px solid var(--border)",
-            background: "var(--bg)",
+            background: "var(--input-bg)",
             color: "var(--text)",
             outline: "none",
             fontSize: 14,
@@ -101,19 +189,23 @@ export function ChatView({ messages, onSend, isConnected, isThinking }: Props) {
         <button
           onClick={handleSend}
           disabled={!isConnected || !input.trim()}
+          aria-label="Send message"
           style={{
-            padding: "10px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 40,
+            height: 40,
             borderRadius: "var(--radius)",
             border: "none",
             background: "var(--accent-bright)",
-            color: "#fff",
+            color: "var(--bg)",
             cursor: isConnected && input.trim() ? "pointer" : "not-allowed",
-            opacity: isConnected && input.trim() ? 1 : 0.5,
-            fontSize: 14,
-            fontWeight: 600,
+            opacity: isConnected && input.trim() ? 1 : 0.4,
+            flexShrink: 0,
           }}
         >
-          Send
+          <IconSend size={18} />
         </button>
       </div>
     </div>

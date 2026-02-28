@@ -4,6 +4,7 @@
  */
 
 import { useState } from "react";
+import type { ComponentType } from "react";
 import "../styles/character-creator.css";
 import type {
   CharacterConfig,
@@ -32,22 +33,33 @@ import {
   ACCESSORIES,
 } from "../character/types";
 import { DynamicCharacter, PartPreview } from "../character/DynamicCharacter";
+import { IconFace, IconHair, IconEyeOpen, IconShirt, IconSparkles, IconShuffle } from "./Icons";
+
+function pick<T>(arr: readonly { value: T }[]): T {
+  return arr[Math.floor(Math.random() * arr.length)].value;
+}
+
+function pickColor(arr: readonly { value: string }[]): string {
+  return arr[Math.floor(Math.random() * arr.length)].value;
+}
 
 interface Props {
   initial: CharacterConfig;
   onSave: (config: CharacterConfig) => void;
   onCancel?: () => void;
   saveLabel?: string;
+  /** When true, inherits the app's active colour theme instead of the pastel palette. */
+  useAppTheme?: boolean;
 }
 
 type Category = "face" | "hair" | "eyes" | "outfit" | "extras";
 
-const CATEGORIES: { id: Category; label: string; icon: string }[] = [
-  { id: "face", label: "Face", icon: "😊" },
-  { id: "hair", label: "Hair", icon: "💇" },
-  { id: "eyes", label: "Eyes", icon: "👁️" },
-  { id: "outfit", label: "Outfit", icon: "👕" },
-  { id: "extras", label: "Extras", icon: "✨" },
+const CATEGORIES: { id: Category; label: string; Icon: ComponentType<{ size?: number }> }[] = [
+  { id: "face", label: "Face", Icon: IconFace },
+  { id: "hair", label: "Hair", Icon: IconHair },
+  { id: "eyes", label: "Eyes", Icon: IconEyeOpen },
+  { id: "outfit", label: "Outfit", Icon: IconShirt },
+  { id: "extras", label: "Extras", Icon: IconSparkles },
 ];
 
 function isLight(hex: string): boolean {
@@ -58,7 +70,7 @@ function isLight(hex: string): boolean {
   return r * 0.299 + g * 0.587 + b * 0.114 > 160;
 }
 
-export function CharacterCreator({ initial, onSave, onCancel, saveLabel = "Save" }: Props) {
+export function CharacterCreator({ initial, onSave, onCancel, saveLabel = "Save", useAppTheme }: Props) {
   const [config, setConfig] = useState<CharacterConfig>({ ...initial });
   const [category, setCategory] = useState<Category>("face");
 
@@ -66,8 +78,29 @@ export function CharacterCreator({ initial, onSave, onCancel, saveLabel = "Save"
     setConfig((prev) => ({ ...prev, [key]: value }));
   };
 
+  const randomize = () => {
+    setConfig((prev) => ({
+      ...prev,
+      skinTone: pickColor(SKIN_TONES),
+      hairColor: pickColor(HAIR_COLORS),
+      hairStyle: pick(HAIR_STYLES) as HairStyle,
+      eyeColor: pickColor(EYE_COLORS),
+      eyeStyle: pick(EYE_STYLES) as EyeStyle,
+      noseStyle: pick(NOSE_STYLES) as NoseStyle,
+      mouthStyle: pick(MOUTH_STYLES) as MouthStyle,
+      blushStyle: pick(BLUSH_STYLES) as BlushStyle,
+      faceShape: pick(FACE_SHAPES) as FaceShape,
+      outfitColor: pickColor(OUTFIT_COLORS),
+      outfitStyle: pick(OUTFIT_STYLES) as OutfitStyle,
+      accessory: pick(ACCESSORIES) as Accessory,
+      accessoryColor: pickColor(ACCESSORY_COLORS),
+    }));
+  };
+
+  const themeClass = useAppTheme ? "cc-app-theme" : "cc-theme";
+
   return (
-    <div className="cc-theme cc-container">
+    <div className={`${themeClass} cc-container`}>
       {/* ─── Live Preview ─────────────────────── */}
       <div className="cc-preview">
         <div className="cc-preview-stage cc-preview-stage-lg">
@@ -89,16 +122,28 @@ export function CharacterCreator({ initial, onSave, onCancel, saveLabel = "Save"
 
       {/* ─── Category Tabs ────────────────────── */}
       <div className="cc-categories">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat.id}
-            className={`cc-cat-btn ${category === cat.id ? "active" : ""}`}
-            onClick={() => setCategory(cat.id)}
-          >
-            <span className="cc-cat-icon">{cat.icon}</span>
-            {cat.label}
-          </button>
-        ))}
+        <button
+          className="cc-cat-btn cc-random-btn"
+          onClick={randomize}
+          title="Randomize"
+          aria-label="Randomize character"
+        >
+          <span className="cc-cat-icon"><IconShuffle size={18} /></span>
+        </button>
+        <div className="cc-cat-divider" />
+        {CATEGORIES.map((cat) => {
+          const CatIcon = cat.Icon;
+          return (
+            <button
+              key={cat.id}
+              className={`cc-cat-btn ${category === cat.id ? "active" : ""}`}
+              onClick={() => setCategory(cat.id)}
+            >
+              <span className="cc-cat-icon"><CatIcon size={18} /></span>
+              {cat.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* ─── Options Panel ────────────────────── */}

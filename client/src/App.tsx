@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { emit } from "@tauri-apps/api/event";
 import { ChatView } from "./components/ChatView";
-import { ConnectionSetup } from "./components/ConnectionSetup";
 import { SessionPanel } from "./components/SessionPanel";
-import { SettingsPanel, loadSettings, type AppSettings } from "./components/SettingsPanel";
+import { SettingsPanel, loadSettings, saveSettings, type AppSettings } from "./components/SettingsPanel";
 import { SkeletalCharacter } from "./components/SkeletalCharacter";
 import { StatusBar } from "./components/StatusBar";
 import { Onboarding } from "./components/Onboarding";
@@ -20,9 +19,12 @@ import {
   type CharacterConfig,
 } from "./character/types";
 import { useBodhi } from "./hooks/useBodhi";
+import { useTheme } from "./hooks/useTheme";
 import type { AnimationAction, ChatMessage, EmotionState, WsIncoming } from "./types";
 
 const STORAGE_KEY = "bodhi-connection";
+const MESSAGES_KEY_PREFIX = "bodhi-messages-";
+const MAX_STORED_MESSAGES = 500;
 
 function loadConfig() {
   try {
@@ -36,11 +38,28 @@ function saveConfig(hostUrl: string, sessionId: string) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ hostUrl, sessionId }));
 }
 
+function loadMessages(sessionId: string): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(MESSAGES_KEY_PREFIX + sessionId);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveMessages(sessionId: string, messages: ChatMessage[]) {
+  const capped = messages.slice(-MAX_STORED_MESSAGES);
+  localStorage.setItem(MESSAGES_KEY_PREFIX + sessionId, JSON.stringify(capped));
+}
+
+export function clearMessages(sessionId: string) {
+  localStorage.removeItem(MESSAGES_KEY_PREFIX + sessionId);
+}
+
 const SIZE_MAP = { small: 64, medium: 128, large: 192 } as const;
 
 export default function App() {
+  const { theme, setTheme } = useTheme();
   const [config, setConfig] = useState(loadConfig);
-  const [connected, setConnected] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -56,7 +75,7 @@ export default function App() {
   const activeChar =
     characters.find((c) => c.id === activeCharId) || characters[0] || createDefaultCharacter();
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessages(config.sessionId));
   const [emotion, setEmotion] = useState<EmotionState>({
     valence: 0,
     arousal: 0,
@@ -64,26 +83,34 @@ export default function App() {
   });
   const [animation, setAnimation] = useState<AnimationAction>("idle");
 
-  const { status, lastMessage, send } = useBodhi(
-    connected ? config.hostUrl : "",
-    connected ? config.sessionId : "",
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      saveMessages(config.sessionId, messages);
+    }
+  }, [messages, config.sessionId]);
+
+  // Always connect — no more gate screen
+  const { status, lastMessage, send, disconnect, reconnect } = useBodhi(
+    config.hostUrl,
+    config.sessionId,
   );
 
-  const handleConnect = useCallback((hostUrl: string, sessionId: string) => {
+  const handleConnectionChange = useCallback((hostUrl: string, sessionId: string) => {
     saveConfig(hostUrl, sessionId);
     setConfig({ hostUrl, sessionId });
-    setConnected(true);
-    setMessages([]);
+    setMessages(loadMessages(sessionId));
   }, []);
 
-  const handleSessionSwitch = useCallback(
-    (newSessionId: string) => {
-      saveConfig(config.hostUrl, newSessionId);
-      setConfig((prev) => ({ ...prev, sessionId: newSessionId }));
-      setMessages([]);
-    },
-    [config.hostUrl],
-  );
+  const handleSessionSwitch = useCallback((sessionId: string) => {
+    saveConfig(config.hostUrl, sessionId);
+    setConfig((prev) => ({ ...prev, sessionId }));
+    setMessages(loadMessages(sessionId));
+  }, [config.hostUrl]);
+
+  const handleSessionDelete = useCallback((sessionId: string) => {
+    clearMessages(sessionId);
+  }, []);
 
   // Process incoming WS messages
   useEffect(() => {
@@ -166,8 +193,8 @@ export default function App() {
   }
 
   // ─── Character editing ───────────────────────────────────
-  const handleEditCharacter = () => {
-    setEditingCharacter({ ...activeChar });
+  const handleEditCharacter = (char?: CharacterConfig) => {
+    setEditingCharacter({ ...(char || activeChar) });
     setIsCreatingNew(false);
   };
 
@@ -177,28 +204,52 @@ export default function App() {
   };
 
   const handleSaveCharacter = (char: CharacterConfig) => {
+    // Auto-increment duplicate names: find lowest available name
+    const otherChars = isCreatingNew ? characters : characters.filter((c) => c.id !== char.id);
+    const existingNames = new Set(otherChars.map((c) => c.name));
+    let finalName = char.name;
+    if (existingNames.has(finalName)) {
+      // Try "Name 2", "Name 3", ... find the first gap
+      for (let i = 2; ; i++) {
+        const candidate = `${char.name} ${i}`;
+        if (!existingNames.has(candidate)) {
+          finalName = candidate;
+          break;
+        }
+      }
+    }
+    const finalChar = { ...char, name: finalName };
+
     let newChars: CharacterConfig[];
     if (isCreatingNew) {
-      newChars = [...characters, char];
+      newChars = [...characters, finalChar];
     } else {
-      newChars = characters.map((c) => (c.id === char.id ? char : c));
+      newChars = characters.map((c) => (c.id === finalChar.id ? finalChar : c));
     }
     saveCharacters(newChars);
-    setActiveCharacterId(char.id);
+    setActiveCharacterId(finalChar.id);
     setCharacters(newChars);
-    setActiveCharId(char.id);
+    setActiveCharId(finalChar.id);
     setEditingCharacter(null);
     setIsCreatingNew(false);
+  };
+
+  const handleDeleteCharacter = (id: string) => {
+    if (characters.length <= 1) return;
+    const newChars = characters.filter((c) => c.id !== id);
+    saveCharacters(newChars);
+    setCharacters(newChars);
+    if (activeCharId === id) {
+      const next = newChars[0];
+      setActiveCharacterId(next.id);
+      setActiveCharId(next.id);
+    }
   };
 
   const handleSwitchCharacter = (id: string) => {
     setActiveCharacterId(id);
     setActiveCharId(id);
   };
-
-  if (!connected) {
-    return <ConnectionSetup initial={config} onSave={handleConnect} />;
-  }
 
   const charSize = SIZE_MAP[settings.characterSize];
 
@@ -207,9 +258,22 @@ export default function App() {
       <StatusBar
         emotion={emotion}
         status={status}
-        onSettingsClick={() => setShowSettings((v) => !v)}
+        onSettingsClick={() => setShowSettings(true)}
+        characters={characters}
+        activeCharacterId={activeChar.id}
+        showCharacter={settings.showCharacter}
+        onToggleCharacter={() => {
+          const next = { ...settings, showCharacter: !settings.showCharacter };
+          setSettings(next);
+          saveSettings(next);
+        }}
+        onSwitchCharacter={handleSwitchCharacter}
       />
-      <SessionPanel currentSession={config.sessionId} onSwitch={handleSessionSwitch} />
+      <SessionPanel
+        currentSession={config.sessionId}
+        onSwitch={handleSessionSwitch}
+        onDelete={handleSessionDelete}
+      />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <div style={{ flex: 1 }}>
           <ChatView
@@ -248,12 +312,21 @@ export default function App() {
           onEditCharacter={handleEditCharacter}
           onNewCharacter={handleNewCharacter}
           onSwitchCharacter={handleSwitchCharacter}
+          onDeleteCharacter={handleDeleteCharacter}
+          hostUrl={config.hostUrl}
+          sessionId={config.sessionId}
+          connectionStatus={status}
+          onConnectionChange={handleConnectionChange}
+          onReconnect={reconnect}
+          onDisconnect={disconnect}
+          theme={theme}
+          onThemeChange={setTheme}
         />
       )}
       {editingCharacter && (
-        <div className="cc-theme" style={{ position: "fixed", inset: 0, zIndex: 200, background: "#faf6ef" }}>
-          <div style={{ padding: "14px 24px 12px", borderBottom: "1px solid #e8e0d4", background: "#faf6ef" }}>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "#4a4035" }}>
+        <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "var(--bg)" }}>
+          <div style={{ padding: "14px 24px 12px", borderBottom: "1px solid var(--border)", background: "var(--bg-secondary)" }}>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600, color: "var(--text)" }}>
               {isCreatingNew ? "Create New Character" : "Edit Character"}
             </h2>
           </div>
@@ -263,6 +336,7 @@ export default function App() {
               onSave={handleSaveCharacter}
               onCancel={() => { setEditingCharacter(null); setIsCreatingNew(false); }}
               saveLabel={isCreatingNew ? "Create" : "Save Changes"}
+              useAppTheme
             />
           </div>
         </div>

@@ -1,32 +1,31 @@
+import type { CharacterConfig } from "../character/types";
 import type { EmotionState } from "../types";
+import { IconSettings, IconEye, IconEyeOff, IconSwap } from "./Icons";
+import { CustomSelect } from "./CustomSelect";
 
 interface Props {
   emotion: EmotionState;
   status: string;
   onSettingsClick?: () => void;
+  // Quick character controls
+  characters?: CharacterConfig[];
+  activeCharacterId?: string;
+  showCharacter?: boolean;
+  onToggleCharacter?: () => void;
+  onSwitchCharacter?: (id: string) => void;
 }
 
-const EMOTION_EMOJI: Record<string, string> = {
-  happy: "😊",
-  sad: "😢",
-  angry: "😠",
-  surprised: "😲",
-  fearful: "😨",
-  disgusted: "🤢",
-  neutral: "😐",
-  calm: "😌",
-  excited: "🤩",
-  confused: "😕",
-};
-
-export function StatusBar({ emotion, status, onSettingsClick }: Props) {
-  const emoji = EMOTION_EMOJI[emotion.label] || "😐";
+export function StatusBar({
+  emotion, status, onSettingsClick,
+  characters, activeCharacterId, showCharacter,
+  onToggleCharacter, onSwitchCharacter,
+}: Props) {
   const statusColor =
     status === "connected"
-      ? "#4ade80"
+      ? "var(--status-ok)"
       : status === "reconnecting"
-        ? "#facc15"
-        : "#ef4444";
+        ? "var(--status-warn)"
+        : "var(--status-error)";
 
   return (
     <div
@@ -50,25 +49,62 @@ export function StatusBar({ emotion, status, onSettingsClick }: Props) {
             display: "inline-block",
           }}
         />
-        <span style={{ color: "var(--text-muted)" }}>{status}</span>
+        <span style={{ color: "var(--text-muted)", textTransform: "capitalize" }}>{status}</span>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <span>{emoji}</span>
-        <span style={{ color: "var(--text-muted)" }}>{emotion.label}</span>
+        <span style={{ color: "var(--text-muted)", fontSize: 12 }}>{emotion.label}</span>
+
+        {/* Quick character toggles */}
+        {characters && characters.length > 0 && onToggleCharacter && (
+          <button
+            onClick={onToggleCharacter}
+            aria-label={showCharacter ? "Hide character" : "Show character"}
+            title={showCharacter ? "Hide character" : "Show character"}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: showCharacter ? "var(--accent-bright)" : "var(--text-muted)",
+              cursor: "pointer",
+              padding: 4,
+              display: "flex",
+              alignItems: "center",
+              borderRadius: 6,
+            }}
+          >
+            {showCharacter ? <IconEye size={16} /> : <IconEyeOff size={16} />}
+          </button>
+        )}
+
+        {characters && characters.length > 1 && onSwitchCharacter && (
+          <div style={{ display: "inline-flex", alignItems: "center" }}>
+            <CustomSelect
+              value={activeCharacterId ?? ""}
+              options={characters.map((c) => ({ value: c.id, label: c.name }))}
+              onChange={(v) => onSwitchCharacter(v)}
+              className="statusbar-char-select"
+              ariaLabel="Switch character"
+            />
+          </div>
+        )}
+
+        <div style={{ width: 1, height: 16, background: "var(--border-subtle)", margin: "0 2px" }} />
+
         {onSettingsClick && (
           <button
             onClick={onSettingsClick}
             style={{
-              marginLeft: 8,
               background: "transparent",
               border: "none",
               color: "var(--text-muted)",
               cursor: "pointer",
-              fontSize: 16,
+              padding: 4,
+              display: "flex",
+              alignItems: "center",
+              borderRadius: 6,
             }}
             title="Settings"
           >
-            ⚙
+            <IconSettings size={16} />
           </button>
         )}
       </div>

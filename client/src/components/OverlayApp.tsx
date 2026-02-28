@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { SkeletalCharacter } from "./SkeletalCharacter";
 import { DynamicCharacter } from "../character/DynamicCharacter";
 import { createDefaultCharacter, type CharacterConfig } from "../character/types";
@@ -44,8 +45,13 @@ export function OverlayApp() {
     return null;
   }
 
+  const handleDragStart = () => {
+    getCurrentWindow().startDragging().catch(() => {});
+  };
+
   return (
     <div
+      onMouseDown={handleDragStart}
       style={{
         width: "100%",
         height: "100%",
@@ -53,6 +59,7 @@ export function OverlayApp() {
         alignItems: "center",
         justifyContent: "center",
         background: "transparent",
+        cursor: "grab",
       }}
     >
       {state.style === "skeletal" ? (

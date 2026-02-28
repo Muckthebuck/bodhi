@@ -1,13 +1,7 @@
+@import "./themes.css";
+
+/* Shared non-colour defaults */
 :root {
-  --bg: #1a1a2e;
-  --bg-secondary: #16213e;
-  --text: #e0e0e0;
-  --text-muted: #888;
-  --accent: #0f3460;
-  --accent-bright: #53a8b6;
-  --user-bubble: #0f3460;
-  --companion-bubble: #1a1a3e;
-  --border: #2a2a4a;
   --radius: 12px;
 }
 
@@ -34,6 +28,73 @@ body {
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+
+/* ── Global focus-visible baseline ── */
+*:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+/* ── Chat styles ── */
+.chat-input:focus {
+  border-color: var(--accent-bright);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+  outline: none;
+}
+
+.chat-send-btn {
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.chat-send-btn:hover:not(:disabled) {
+  background: var(--accent-hover) !important;
+}
+
+.chat-send-btn:focus-visible {
+  outline-offset: 2px;
+}
+
+.statusbar-settings-btn:hover {
+  background: var(--hover-overlay);
+}
+
+/* ── Compact custom select in status bar ── */
+.statusbar-char-select {
+  width: auto;
+  min-width: 80px;
+}
+
+.statusbar-char-select .custom-select-trigger {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+  gap: 4px;
+}
+
+.statusbar-char-select .custom-select-trigger:hover {
+  background: var(--hover-overlay);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.statusbar-char-select .custom-select-trigger.open {
+  background: var(--hover-overlay);
+  border-color: var(--accent-bright);
+}
+
+.statusbar-char-select .custom-select-menu {
+  min-width: 120px;
+  right: 0;
+  left: auto;
+}
+
+.statusbar-char-select .custom-select-option {
+  padding: 6px 10px;
+  font-size: 12px;
+}
 
 /* Character SVG animation is now lerp-based in JS — no CSS transitions needed */

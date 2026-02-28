@@ -1,0 +1,132 @@
+/* ═══════════════════════════════════════════════════════
+   Bodhi Theme System — 4 colour modes
+   Applied via data-theme attribute on <html>
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Light ── */
+[data-theme="light"] {
+  color-scheme: light;
+  --bg:               #f5f5f7;
+  --bg-secondary:     #ffffff;
+  --bg-tertiary:      #eaeaee;
+  --text:             #1d1d1f;
+  --text-secondary:   #3a3a3c;
+  --text-muted:       #86868b;
+  --accent:           #0071e3;
+  --accent-bright:    #0077ed;
+  --accent-hover:     #0068d6;
+  --accent-subtle:    rgba(0, 113, 227, 0.08);
+  --user-bubble:      #0071e3;
+  --user-bubble-text: #ffffff;
+  --companion-bubble: #e9e9eb;
+  --companion-text:   #1d1d1f;
+  --border:           #d2d2d7;
+  --border-subtle:    #e5e5ea;
+  --radius:           12px;
+  --shadow-sm:        0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md:        0 4px 12px rgba(0,0,0,0.08);
+  --status-ok:        #34c759;
+  --status-warn:      #ff9f0a;
+  --status-error:     #ff3b30;
+  --input-bg:         #ffffff;
+  --hover-overlay:    rgba(0,0,0,0.03);
+  --active-overlay:   rgba(0,0,0,0.06);
+  --card-bg:          #ffffff;
+  --scrollbar-thumb:  #c7c7cc;
+}
+
+/* ── Beige (warm) ── */
+[data-theme="beige"] {
+  color-scheme: light;
+  --bg:               #f5f0e8;
+  --bg-secondary:     #faf6ef;
+  --bg-tertiary:      #ece5d8;
+  --text:             #3c3226;
+  --text-secondary:   #5a4e40;
+  --text-muted:       #8c8070;
+  --accent:           #b87333;
+  --accent-bright:    #c47d3a;
+  --accent-hover:     #a6682e;
+  --accent-subtle:    rgba(184, 115, 51, 0.08);
+  --user-bubble:      #b87333;
+  --user-bubble-text: #ffffff;
+  --companion-bubble: #ece5d8;
+  --companion-text:   #3c3226;
+  --border:           #d6cdbf;
+  --border-subtle:    #e2dace;
+  --radius:           12px;
+  --shadow-sm:        0 1px 3px rgba(60,50,38,0.06);
+  --shadow-md:        0 4px 12px rgba(60,50,38,0.08);
+  --status-ok:        #5a9a32;
+  --status-warn:      #d4841a;
+  --status-error:     #c0392b;
+  --input-bg:         #faf6ef;
+  --hover-overlay:    rgba(60,50,38,0.03);
+  --active-overlay:   rgba(60,50,38,0.06);
+  --card-bg:          #faf6ef;
+  --scrollbar-thumb:  #c9bfb0;
+}
+
+/* ── Midnight (dark bluish – the original) ── */
+[data-theme="midnight"] {
+  color-scheme: dark;
+  --bg:               #1a1a2e;
+  --bg-secondary:     #16213e;
+  --bg-tertiary:      #1e2a4a;
+  --text:             #e0e0e0;
+  --text-secondary:   #b0b0c0;
+  --text-muted:       #6b6b8a;
+  --accent:           #0f3460;
+  --accent-bright:    #53a8b6;
+  --accent-hover:     #4a97a3;
+  --accent-subtle:    rgba(83, 168, 182, 0.1);
+  --user-bubble:      #0f3460;
+  --user-bubble-text: #e0e0e0;
+  --companion-bubble: #1a1a3e;
+  --companion-text:   #e0e0e0;
+  --border:           #2a2a4a;
+  --border-subtle:    #252545;
+  --radius:           12px;
+  --shadow-sm:        0 1px 3px rgba(0,0,0,0.2);
+  --shadow-md:        0 4px 12px rgba(0,0,0,0.3);
+  --status-ok:        #4ade80;
+  --status-warn:      #facc15;
+  --status-error:     #ef4444;
+  --input-bg:         #1a1a2e;
+  --hover-overlay:    rgba(255,255,255,0.04);
+  --active-overlay:   rgba(255,255,255,0.07);
+  --card-bg:          #16213e;
+  --scrollbar-thumb:  #2a2a4a;
+}
+
+/* ── Charcoal (true dark – VS Code style) ── */
+[data-theme="charcoal"] {
+  color-scheme: dark;
+  --bg:               #1e1e1e;
+  --bg-secondary:     #252526;
+  --bg-tertiary:      #2d2d2d;
+  --text:             #cccccc;
+  --text-secondary:   #9d9d9d;
+  --text-muted:       #6a6a6a;
+  --accent:           #264f78;
+  --accent-bright:    #0078d4;
+  --accent-hover:     #006cbf;
+  --accent-subtle:    rgba(0, 120, 212, 0.1);
+  --user-bubble:      #264f78;
+  --user-bubble-text: #cccccc;
+  --companion-bubble: #2d2d2d;
+  --companion-text:   #cccccc;
+  --border:           #3c3c3c;
+  --border-subtle:    #333333;
+  --radius:           12px;
+  --shadow-sm:        0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md:        0 4px 12px rgba(0,0,0,0.4);
+  --status-ok:        #4ec9b0;
+  --status-warn:      #dcdcaa;
+  --status-error:     #f44747;
+  --input-bg:         #1e1e1e;
+  --hover-overlay:    rgba(255,255,255,0.04);
+  --active-overlay:   rgba(255,255,255,0.06);
+  --card-bg:          #252526;
+  --scrollbar-thumb:  #424242;
+}

@@ -3,6 +3,7 @@
    Animal Crossing / Loftia-inspired warm pastel UI
    ────────────────────────────────────────────────────── */
 
+/* Onboarding keeps its own warm pastel palette */
 .cc-theme {
   --cc-bg: #faf6ef;
   --cc-bg-alt: #f0ebe0;
@@ -20,6 +21,60 @@
   --cc-shadow-lg: rgba(120, 100, 70, 0.12);
   --cc-radius: 18px;
   --cc-radius-sm: 12px;
+}
+
+/* Settings editor inherits the active app theme */
+.cc-app-theme {
+  --cc-bg: var(--bg);
+  --cc-bg-alt: var(--bg-secondary);
+  --cc-card: var(--card-bg);
+  --cc-card-hover: var(--hover-overlay);
+  --cc-border: var(--border);
+  --cc-text: var(--text);
+  --cc-text-muted: var(--text-muted);
+  --cc-accent: var(--accent-bright);
+  --cc-accent-hover: var(--accent-hover);
+  --cc-accent-soft: var(--accent-subtle);
+  --cc-peach: var(--status-warn);
+  --cc-mint: var(--accent-bright);
+  --cc-shadow: var(--shadow-sm);
+  --cc-shadow-lg: var(--shadow-md);
+  --cc-radius: 18px;
+  --cc-radius-sm: 12px;
+}
+
+/* Override preview stage for app theme — uses bg-tertiary instead of hardcoded green */
+.cc-app-theme .cc-preview-stage,
+.cc-app-theme .onboard-preview-stage {
+  background: var(--bg-tertiary);
+  box-shadow: var(--shadow-md);
+}
+
+/* Override save/primary button text for app theme — use bg instead of hardcoded white */
+.cc-app-theme .cc-save-btn,
+.cc-app-theme .onboard-primary-btn {
+  color: var(--bg);
+  box-shadow: var(--shadow-md);
+}
+
+.cc-app-theme .cc-save-btn:hover,
+.cc-app-theme .onboard-primary-btn:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Override swatch selected ring for app theme */
+.cc-app-theme .cc-swatch.selected {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-bright), var(--shadow-sm);
+}
+
+/* Override style card selected shadow for app theme */
+.cc-app-theme .cc-style-card.selected {
+  box-shadow: var(--shadow-sm);
+}
+
+/* Fix swatch checkmark on dark themes */
+.cc-app-theme .cc-swatch.selected.light::after {
+  color: var(--text);
 }
 
 /* ─── Onboarding Root ───────────────────────────────── */
@@ -343,6 +398,26 @@
 
 .cc-name-input::placeholder {
   color: var(--cc-text-muted);
+}
+
+.cc-random-btn {
+  min-width: auto !important;
+  padding: 6px 8px 4px !important;
+  color: var(--cc-text-muted);
+}
+
+.cc-random-btn:hover {
+  color: var(--cc-accent);
+  background: var(--cc-accent-soft);
+}
+
+.cc-cat-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--cc-border);
+  align-self: center;
+  flex-shrink: 0;
+  margin: 0 2px;
 }
 
 /* ─── Category Tabs ─────────────────────────────────── */

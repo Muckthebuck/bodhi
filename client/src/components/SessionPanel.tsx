@@ -3,6 +3,7 @@ import { useState } from "react";
 interface Props {
   currentSession: string;
   onSwitch: (sessionId: string) => void;
+  onDelete?: (sessionId: string) => void;
 }
 
 const SESSION_STORAGE_KEY = "bodhi-sessions";
@@ -19,7 +20,7 @@ function saveSessions(sessions: string[]) {
   localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessions));
 }
 
-export function SessionPanel({ currentSession, onSwitch }: Props) {
+export function SessionPanel({ currentSession, onSwitch, onDelete }: Props) {
   const [sessions, setSessions] = useState<string[]>(loadSessions);
   const [newName, setNewName] = useState("");
   const [expanded, setExpanded] = useState(false);
@@ -32,6 +33,18 @@ export function SessionPanel({ currentSession, onSwitch }: Props) {
     saveSessions(updated);
     setNewName("");
     onSwitch(name);
+  };
+
+  const deleteSession = (sessionId: string) => {
+    if (sessions.length <= 1) return;
+    if (!confirm(`Delete session "${sessionId}"?`)) return;
+    const updated = sessions.filter((s) => s !== sessionId);
+    setSessions(updated);
+    saveSessions(updated);
+    onDelete?.(sessionId);
+    if (sessionId === currentSession) {
+      onSwitch(updated[0]);
+    }
   };
 
   return (
@@ -63,21 +76,40 @@ export function SessionPanel({ currentSession, onSwitch }: Props) {
         <div style={{ padding: "4px 16px 10px" }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
             {sessions.map((s) => (
-              <button
-                key={s}
-                onClick={() => onSwitch(s)}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  border: s === currentSession ? "1px solid var(--accent-bright)" : "1px solid var(--border)",
-                  background: s === currentSession ? "var(--accent)" : "transparent",
-                  color: "var(--text)",
-                  cursor: "pointer",
-                  fontSize: 12,
-                }}
-              >
-                {s}
-              </button>
+              <div key={s} style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                <button
+                  onClick={() => onSwitch(s)}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 6,
+                    border: s === currentSession ? "1px solid var(--accent-bright)" : "1px solid var(--border)",
+                    background: s === currentSession ? "var(--accent)" : "transparent",
+                    color: "var(--text)",
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  {s}
+                </button>
+                {sessions.length > 1 && (
+                  <button
+                    onClick={() => deleteSession(s)}
+                    title={`Delete ${s}`}
+                    style={{
+                      padding: "2px 5px",
+                      borderRadius: 4,
+                      border: "none",
+                      background: "transparent",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
             ))}
           </div>
           <div style={{ display: "flex", gap: 4 }}>

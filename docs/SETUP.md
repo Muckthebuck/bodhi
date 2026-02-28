@@ -457,3 +457,18 @@ bodhi/
 8. Test on RPi5 with fresh OS install
 9. Create client SDKs (Python, JavaScript)
 10. Write security audit checklist
+
+## Known Platform Issues
+
+### Character Overlay on Wayland (Linux)
+The floating character overlay uses `alwaysOnTop` to stay visible above other windows.
+**Wayland compositors (GNOME Mutter, KDE KWin) intentionally restrict this** — the overlay
+may lose focus and go behind other windows when you click away.
+
+**Workaround:** Use an X11 session instead:
+1. Log out of your desktop session
+2. At the login screen, click the gear icon (⚙) next to the "Sign In" button
+3. Select **"Ubuntu on Xorg"** (or equivalent X11 session)
+4. Log back in — always-on-top will work correctly
+
+This does **not** affect Windows or macOS — the overlay works as expected there.

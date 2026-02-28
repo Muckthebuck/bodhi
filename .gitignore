@@ -58,6 +58,9 @@ data/
 logs/
 *.log
 
+# Tauri
+client/src-tauri/target/
+
 # IDE
 .vscode/
 .idea/

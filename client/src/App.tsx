@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { emit } from "@tauri-apps/api/event";
 import { ChatView } from "./components/ChatView";
 import { ConnectionSetup } from "./components/ConnectionSetup";
 import { SessionPanel } from "./components/SessionPanel";
@@ -112,6 +113,16 @@ export default function App() {
     },
     [send],
   );
+
+  // Emit overlay state to the overlay window via Tauri events
+  useEffect(() => {
+    emit("overlay-update", {
+      emotion,
+      action: animation,
+      style: settings.characterStyle,
+      size: SIZE_MAP[settings.characterSize],
+    }).catch(() => { /* overlay window may not exist yet */ });
+  }, [emotion, animation, settings.characterStyle, settings.characterSize]);
 
   if (!connected) {
     return <ConnectionSetup initial={config} onSave={handleConnect} />;

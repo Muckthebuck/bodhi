@@ -16,10 +16,16 @@ pub fn run() {
                 )?;
             }
 
+            // Show the overlay window on startup
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                let _ = overlay.show();
+            }
+
             // System tray
             let show = MenuItem::with_id(app, "show", "Open Bodhi", true, None::<&str>)?;
+            let toggle_overlay = MenuItem::with_id(app, "toggle_overlay", "Hide Character", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &quit])?;
+            let menu = Menu::with_items(app, &[&show, &toggle_overlay, &quit])?;
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -30,6 +36,15 @@ pub fn run() {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
                             let _ = window.set_focus();
+                        }
+                    }
+                    "toggle_overlay" => {
+                        if let Some(overlay) = app.get_webview_window("overlay") {
+                            if overlay.is_visible().unwrap_or(false) {
+                                let _ = overlay.hide();
+                            } else {
+                                let _ = overlay.show();
+                            }
                         }
                     }
                     "quit" => {

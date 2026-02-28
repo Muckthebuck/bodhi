@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChatView } from "./components/ChatView";
 import { ConnectionSetup } from "./components/ConnectionSetup";
+import { SessionPanel } from "./components/SessionPanel";
+import { SettingsPanel, loadSettings, type AppSettings } from "./components/SettingsPanel";
+import { SkeletalCharacter } from "./components/SkeletalCharacter";
 import { SpriteCharacter } from "./components/SpriteCharacter";
 import { StatusBar } from "./components/StatusBar";
 import { useBodhi } from "./hooks/useBodhi";
@@ -20,9 +23,13 @@ function saveConfig(hostUrl: string, sessionId: string) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ hostUrl, sessionId }));
 }
 
+const SIZE_MAP = { small: 64, medium: 128, large: 192 } as const;
+
 export default function App() {
   const [config, setConfig] = useState(loadConfig);
   const [connected, setConnected] = useState(false);
+  const [settings, setSettings] = useState<AppSettings>(loadSettings);
+  const [showSettings, setShowSettings] = useState(false);
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [emotion, setEmotion] = useState<EmotionState>({
@@ -43,6 +50,15 @@ export default function App() {
     setConnected(true);
     setMessages([]);
   }, []);
+
+  const handleSessionSwitch = useCallback(
+    (newSessionId: string) => {
+      saveConfig(config.hostUrl, newSessionId);
+      setConfig((prev) => ({ ...prev, sessionId: newSessionId }));
+      setMessages([]);
+    },
+    [config.hostUrl],
+  );
 
   // Process incoming WS messages
   useEffect(() => {
@@ -101,9 +117,18 @@ export default function App() {
     return <ConnectionSetup initial={config} onSave={handleConnect} />;
   }
 
+  const charSize = SIZE_MAP[settings.characterSize];
+  const CharacterComponent =
+    settings.characterStyle === "skeletal" ? SkeletalCharacter : SpriteCharacter;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <StatusBar emotion={emotion} status={status} />
+      <StatusBar
+        emotion={emotion}
+        status={status}
+        onSettingsClick={() => setShowSettings((v) => !v)}
+      />
+      <SessionPanel currentSession={config.sessionId} onSwitch={handleSessionSwitch} />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <div style={{ flex: 1 }}>
           <ChatView
@@ -113,19 +138,28 @@ export default function App() {
             isThinking={animation === "thinking"}
           />
         </div>
-        <div
-          style={{
-            width: 160,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderLeft: "1px solid var(--border)",
-            background: "var(--bg-secondary)",
-          }}
-        >
-          <SpriteCharacter emotion={emotion} action={animation} size={128} />
-        </div>
+        {settings.showCharacter && (
+          <div
+            style={{
+              width: charSize + 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderLeft: "1px solid var(--border)",
+              background: "var(--bg-secondary)",
+            }}
+          >
+            <CharacterComponent emotion={emotion} action={animation} size={charSize} />
+          </div>
+        )}
       </div>
+      {showSettings && (
+        <SettingsPanel
+          settings={settings}
+          onUpdate={setSettings}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </div>
   );
 }

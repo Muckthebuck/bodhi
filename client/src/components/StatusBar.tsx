@@ -3,6 +3,7 @@ import type { EmotionState } from "../types";
 interface Props {
   emotion: EmotionState;
   status: string;
+  onSettingsClick?: () => void;
 }
 
 const EMOTION_EMOJI: Record<string, string> = {
@@ -18,7 +19,7 @@ const EMOTION_EMOJI: Record<string, string> = {
   confused: "😕",
 };
 
-export function StatusBar({ emotion, status }: Props) {
+export function StatusBar({ emotion, status, onSettingsClick }: Props) {
   const emoji = EMOTION_EMOJI[emotion.label] || "😐";
   const statusColor =
     status === "connected"
@@ -54,6 +55,22 @@ export function StatusBar({ emotion, status }: Props) {
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <span>{emoji}</span>
         <span style={{ color: "var(--text-muted)" }}>{emotion.label}</span>
+        {onSettingsClick && (
+          <button
+            onClick={onSettingsClick}
+            style={{
+              marginLeft: 8,
+              background: "transparent",
+              border: "none",
+              color: "var(--text-muted)",
+              cursor: "pointer",
+              fontSize: 16,
+            }}
+            title="Settings"
+          >
+            ⚙
+          </button>
+        )}
       </div>
     </div>
   );

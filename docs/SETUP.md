@@ -342,6 +342,110 @@ sudo systemctl restart dhcpcd
 - Evaluation agent determines what to keep/forget
 - Mimics human memory consolidation during "sleep" cycles
 
+## Developer Environment Setup
+
+### Prerequisites
+
+**Host services (Python backend):**
+```bash
+# Python 3.12+
+python3 --version  # must be 3.12+
+
+# Install dev dependencies
+pip install -r requirements-dev.txt
+```
+
+**Client app (Tauri + React):**
+```bash
+# Node.js 22+
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Rust (latest stable)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+
+# Tauri system dependencies (Linux)
+sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev patchelf
+# Note: libayatana-appindicator3-dev may already be installed;
+# it replaces the older libappindicator3-dev that conflicts with it.
+
+# Tauri system dependencies (Windows)
+# No extra deps needed — WebView2 ships with Windows 10/11
+
+# Install client dependencies
+cd client && npm install
+```
+
+### Running Services (Development)
+
+```bash
+# Start infrastructure (Redis, Postgres, Neo4j, Qdrant, monitoring)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# Run individual services (outside Docker for dev)
+cd services/central-agent && uvicorn main:app --reload --port 8000
+cd services/memory-manager && uvicorn main:app --reload --port 8001
+cd services/emotion-regulator && uvicorn main:app --reload --port 8002
+cd services/language-center && uvicorn main:app --reload --port 8003
+```
+
+### Running the Client App (Development)
+
+```bash
+cd client
+npm run tauri dev    # launches Tauri app with hot-reload
+npm run dev          # React dev server only (browser at http://localhost:5173)
+```
+
+### Linting & Type Checking
+
+```bash
+# Python (ruff + mypy)
+bash scripts/lint.sh          # check only
+bash scripts/lint.sh --fix    # auto-fix
+
+# Client (ESLint + TypeScript)
+cd client && npm run lint && npm run typecheck
+```
+
+### Running Tests
+
+```bash
+# Unit tests (no infrastructure needed)
+python3 -m pytest tests/unit/ -q
+
+# Smoke tests (requires running infrastructure)
+python3 -m pytest tests/smoke/ -m smoke -q
+
+# Client tests
+cd client && npm test
+```
+
+### Project Structure
+
+```
+bodhi/
+├── services/                # Python microservices (FastAPI)
+│   ├── central-agent/       # Orchestration, WebSocket, REST API
+│   ├── language-center/     # NLU/NLG, sentiment, response generation
+│   ├── memory-manager/      # Three-tier memory (Redis/Postgres/Qdrant)
+│   └── emotion-regulator/   # VAD emotion model, emotion history
+├── client/                  # Tauri + React desktop app
+│   ├── src/                 # React frontend (TypeScript)
+│   └── src-tauri/           # Rust backend (system tray, windows)
+├── infra/                   # DB init scripts, configs
+├── monitoring/              # Prometheus, Grafana, Loki configs
+├── protos/                  # gRPC protobuf definitions
+├── scripts/                 # Dev scripts (setup, lint, backup)
+├── tests/                   # Python tests (unit + smoke)
+├── docs/                    # Architecture & design docs
+├── docker-compose.yml       # Production stack
+├── docker-compose.dev.yml   # Dev overrides
+├── pyproject.toml           # Ruff + mypy config
+└── pytest.ini               # Pytest config
+```
+
 ## Next Steps
 1. Make architecture decisions (remote access, permissions, storage)
 2. Design system architecture diagram
